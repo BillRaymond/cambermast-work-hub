@@ -1,4 +1,4 @@
-# Cambermast Works (frontend)
+# Cambermast Work Hub (frontend)
 
 This is the SvelteKit site that runs at `https://w.cambermast.com`. It gives the homelab a polished front door where each workspace lives under a predictable `/project-*` route.
 
@@ -13,13 +13,7 @@ This is the SvelteKit site that runs at `https://w.cambermast.com`. It gives the
 
 1. Copy `.env.example` to `.env` (already done in this repo) and adjust ports or `PUBLIC_SITE_ORIGIN` if needed.
 2. Open the folder in VS Code, run **Dev Containers: Reopen in Container**, and wait for the Node 20 container to build. `npm install` runs automatically after the container is created.
-3. Start the dev server with:
-
-	```bash
-	npm run dev -- --host 0.0.0.0 --port 5173
-	```
-
-	Forward port 5173 through VS Code to preview the site in your browser.
+3. When the container starts, it automatically launches `npm run dev -- --host 0.0.0.0 --port 5173` in the background via `scripts/start-dev.sh`. Forward port 5173 through VS Code to preview the site in your browser. Run `scripts/stop-dev.sh` if you need to tear it down (the start script will recreate it), and inspect `.devserver.log` for the live dev-server logs.
 4. Use git inside the container to commit/sync changes. This repo stays separate from the homelab configuration.
 
 ## Production build
