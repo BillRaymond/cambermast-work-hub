@@ -26,7 +26,7 @@
 		<div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6">
 			<a href="/" class="flex flex-col">
 				<span class="text-xs uppercase tracking-[0.3em] text-primary-electric">Cambermast</span>
-				<span class="text-2xl font-bold text-primary-navy">Works Hub</span>
+				<span class="text-2xl font-bold text-primary-navy">Work Hub</span>
 			</a>
 
 			<nav class="flex flex-wrap items-center gap-4 text-sm font-semibold text-secondary-slate/80">
