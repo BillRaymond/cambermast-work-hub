@@ -1,0 +1,18 @@
+{
+  "name": "Cambermast Work Hub",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+  "postCreateCommand": "npm install",
+  "forwardPorts": [5173],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "svelte.svelte-vscode",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "openai.chatgpt",
+        "bradlc.vscode-tailwindcss",
+        "github.vscode-github-actions"
+      ]
+    }
+  }
+}

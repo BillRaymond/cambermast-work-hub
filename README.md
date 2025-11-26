@@ -9,13 +9,18 @@ This is the SvelteKit site that runs at `https://w.cambermast.com`. It gives the
 - **Tailwind CSS** with the Cambermast palette, typography tokens, and helper utilities defined in `tailwind.config.ts`.
 - **Prettier-ready** thanks to the default SvelteKit tooling (`npm run format` if you enable it later).
 
-## Local development
+## Local development (VS Code dev container)
 
-```bash
-cd web
-npm install
-npm run dev -- --host 0.0.0.0 --port 5173
-```
+1. Copy `.env.example` to `.env` (already done in this repo) and adjust ports or `PUBLIC_SITE_ORIGIN` if needed.
+2. Open the folder in VS Code, run **Dev Containers: Reopen in Container**, and wait for the Node 20 container to build. `npm install` runs automatically after the container is created.
+3. Start the dev server with:
+
+	```bash
+	npm run dev -- --host 0.0.0.0 --port 5173
+	```
+
+	Forward port 5173 through VS Code to preview the site in your browser.
+4. Use git inside the container to commit/sync changes. This repo stays separate from the homelab configuration.
 
 ## Production build
 
@@ -24,7 +29,7 @@ npm run build
 npm run preview -- --host 0.0.0.0 --port 4173
 ```
 
-The Docker entrypoint inside `../entrypoint.sh` runs the exact commands above on every container start, so redeploys always serve a fresh build.
+The Docker entrypoint inside the homelab `sveltekit` service runs the same commands, so redeploys always serve a fresh build.
 
 ## Adding workspaces
 
