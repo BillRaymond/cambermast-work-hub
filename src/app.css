@@ -1,0 +1,34 @@
+@import '@fontsource/inter/latin.css';
+@import '@fontsource/source-sans-3/latin.css';
+@import '@fontsource/jetbrains-mono/latin.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		color-scheme: light;
+		background-color: #f7fafc;
+		font-family: 'Inter', 'Source Sans 3', system-ui, sans-serif;
+	}
+
+	body {
+		@apply font-sans text-secondary-slate bg-secondary-cool antialiased;
+		min-height: 100vh;
+	}
+
+	::selection {
+		@apply bg-primary-electric text-white;
+	}
+}
+
+@layer components {
+	.section-shell {
+		@apply rounded-3xl border border-white/60 bg-white/90 p-8 shadow-card backdrop-blur;
+	}
+
+	.badge {
+		@apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider;
+	}
+}
