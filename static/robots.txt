@@ -1,3 +1,4 @@
-# block all crawlers from indexing the site
+# Block all crawlers from indexing or following links on the Cambermast Work Hub
 User-agent: *
 Disallow: /
+Noindex: /

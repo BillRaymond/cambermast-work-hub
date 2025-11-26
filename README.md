@@ -1,6 +1,6 @@
 # Cambermast Work Hub (frontend)
 
-This is the SvelteKit site that runs at `https://w.cambermast.com`. It gives the homelab a polished front door where each workspace lives under a predictable `/project-*` route.
+This is the SvelteKit site that powers the Cambermast Work Hub. It now functions as a simple front door for the Work Hub overview plus the `liamottley` subsite.
 
 ## Stack
 
@@ -25,12 +25,6 @@ npm run preview -- --host 0.0.0.0 --port 4173
 
 The Docker entrypoint inside the homelab `sveltekit` service runs the same commands, so redeploys always serve a fresh build.
 
-## Adding workspaces
-
-1. Update `src/lib/data/projects.ts` with a new object. This automatically feeds the homepage navigation and the shared `[slug]` route.
-2. (Optional) Drop a bespoke page in `src/routes/<slug>/+page.svelte` if you want a custom layout.
-3. Rebuild or restart `docker compose` from the parent directory.
-
 ## Styling tokens
 
 Tailwind exposes:
@@ -40,3 +34,8 @@ Tailwind exposes:
 - Card shadows, rounded corners, and a radial grid background utility
 
 Stick to these tokens and your sub-sites will always align with cambermast.com.
+
+## Editing the current pages
+
+- `src/routes/+page.svelte` renders the lightweight Cambermast Work Hub overview with the contact link.
+- `src/routes/liamottley/+page.svelte` acts as the dedicated Liam Ottley subsite and can be iterated on without touching other routes.

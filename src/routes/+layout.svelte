@@ -1,20 +1,18 @@
 <script lang="ts">
 	import '../app.css';
-	import { projects } from '$lib/data/projects';
 
 	const navigation = [
 		{ href: '/', label: 'Overview' },
-		...projects.map((project) => ({ href: `/${project.slug}`, label: project.title }))
-	];
-
-	const labs = [
-		{ label: 'Status reports', href: 'https://cambermast.com' },
-		{ label: 'n8n workflows', href: 'https://n8n.cambermast.com' }
+		{ href: '/liamottley', label: 'Liam Ottley' }
 	];
 
 	let { children } = $props();
 	const currentYear = new Date().getFullYear();
 </script>
+
+<svelte:head>
+	<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+</svelte:head>
 
 <div class="min-h-screen bg-secondary-cool/80 text-secondary-slate">
 	<div
@@ -42,9 +40,11 @@
 
 			<a
 				class="inline-flex items-center gap-2 rounded-full bg-primary-electric px-5 py-2 font-semibold text-white shadow-lg shadow-primary-electric/30 transition hover:-translate-y-0.5"
-				href="mailto:bill.raymond@cambermast.com?subject=New%20Workspace"
+				href="https://www.cambermast.com/contact"
+				target="_blank"
+				rel="noreferrer"
 			>
-				Add workspace
+				Contact Cambermast
 				<span aria-hidden="true">↗</span>
 			</a>
 		</div>
@@ -56,18 +56,8 @@
 
 	<footer class="border-t border-white/40 bg-white/80 text-sm text-secondary-slate/80">
 		<div class="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 md:flex-row md:items-center md:justify-between">
-			<p class="font-semibold">© {currentYear} Cambermast Homelab</p>
-			<div class="flex flex-wrap items-center gap-4">
-				{#each labs as lab}
-					<a
-						class="text-primary-electric transition hover:text-primary-navy"
-						href={lab.href}
-					>
-						{lab.label}
-					</a>
-				{/each}
-			</div>
-			<p class="font-semibold text-primary-navy">w.cambermast.com</p>
+			<p class="font-semibold">© {currentYear} Cambermast Work Hub</p>
+			<p class="font-semibold text-primary-navy">Private in-progress workspace</p>
 		</div>
 	</footer>
 </div>
