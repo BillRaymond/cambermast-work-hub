@@ -41,7 +41,7 @@
 			id: 'latest',
 			title: 'Latest AI News',
 			description: 'Fresh drops from the labs, feeds, and rumor mills.',
-			prompt: 'Latest AI News'
+			prompt: 'Latest AI news and breakthroughs'
 		},
 		{
 			id: 'policy',
@@ -53,19 +53,25 @@
 			id: 'product',
 			title: 'Breakout Product Launches',
 			description: 'New tools, AI assistants, and platform launches landing this week.',
-			prompt: 'New AI product launches worth covering'
+			prompt: 'Breakout AI product launches and feature drops worth covering'
 		},
 		{
 			id: 'research',
 			title: 'Research Signals',
 			description: 'Labs, arXiv, and stealth research that could spark a video.',
-			prompt: 'Cutting-edge AI research stories'
+			prompt: 'Cutting-edge AI research papers, pilots, and lab reveals'
 		},
 		{
 			id: 'creator',
 			title: 'Creator & Community Hype',
 			description: 'Stories bubbling up from X, Discord, and indie builders.',
-			prompt: 'Creator-led AI trends'
+			prompt: 'Creator-led AI trends, viral tools, and community chatter'
+		},
+		{
+			id: 'ops',
+			title: 'AI Ops Playbooks',
+			description: 'Workflow, automation, and ops wins that deserve a breakdown.',
+			prompt: 'AI workflow and operations playbooks with measurable wins'
 		}
 	] as const;
 	type StoryType = (typeof STORY_TYPES)[number];
@@ -132,7 +138,7 @@
 
 	let targetUrl = defaultUrl;
 	let callbackUrl = derivedCallbackUrl;
-	let selectedStoryTypeId: StoryType['id'] = defaultStoryType.id;
+	let selectedStoryTypeId: StoryType['id'] | null = defaultStoryType.id;
 	let investigateInput: string = defaultStoryType.prompt;
 	let isLoading = false;
 	let latestResponse = '';
@@ -374,53 +380,79 @@
 	<section class="section-shell border border-white/50">
 		<div class="space-y-6">
 			<div class="space-y-2">
-				<p class="badge bg-primary-electric/10 text-primary-electric">Webhook console</p>
-				<h2 class="text-2xl font-semibold text-primary-navy">Trigger a POST + watch the callbacks roll in</h2>
+				<p class="badge bg-primary-electric/10 text-primary-electric">AI News Aggregator</p>
+				<h2 class="text-2xl font-semibold text-primary-navy">Start researching</h2>
 				<p class="text-secondary-slate/90">
-					Enter a POST endpoint, trigger it, and inspect the response without leaving this route. The field defaults to
-					the testing webhook we use for Cambermast automation dry runs.
+					Feed the automation with investigation prompts for new video ideas, send it to your POST endpoint, and watch the
+					response land without leaving this page. We default to Cambermast's dry-run webhook so you can test instantly.
 				</p>
-			</div>
-
-			<div class="space-y-4 rounded-2xl border border-white/60 bg-white/70 p-4">
-				<div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-					<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Hot AI story types</p>
-					<p class="text-xs text-secondary-slate/80">Tap a preset to auto-fill the investigation prompt.</p>
-				</div>
-				<div class="grid gap-3 md:grid-cols-2">
-					{#each STORY_TYPES as story (story.id)}
-						<button
-							type="button"
-							class={`rounded-2xl border p-4 text-left transition ${
-								selectedStoryTypeId === story.id
-									? 'border-primary-electric bg-primary-electric/10 text-primary-navy shadow-card'
-									: 'border-white/60 bg-white text-secondary-slate hover:border-primary-electric/40'
-							}`}
-							on:click={() => setStoryType(story.id)}
-						>
-							<p class="text-sm font-semibold uppercase tracking-[0.3em]">{story.title}</p>
-							<p class="mt-2 text-sm text-secondary-slate/80">{story.description}</p>
-						</button>
-					{/each}
-				</div>
 			</div>
 
 			<form class="space-y-4" on:submit|preventDefault={runPost}>
 				<label class="block text-sm font-medium text-secondary-slate/90" for="investigate-prompt">
 					Story signal to investigate
 				</label>
-				<input
-					id="investigate-prompt"
-					name="investigate-prompt"
-					class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
-					bind:value={investigateInput}
-					placeholder="Latest AI News"
-					type="text"
-					required
-				/>
-				<p class="text-xs text-secondary-slate/80">
-					We send this text to the automation as the <code>investigate</code> payload. Edit it or pick a preset above.
-				</p>
+				<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+					<div class="flex-1 space-y-2">
+						<input
+							id="investigate-prompt"
+							name="investigate-prompt"
+							class="h-16 w-full rounded-3xl border-2 border-primary-electric/60 bg-white px-6 text-lg font-semibold text-primary-navy shadow-card focus:border-primary-electric focus:outline-none"
+							value={investigateInput}
+							on:input={(event) => {
+								const value = (event.currentTarget as HTMLInputElement).value;
+								investigateInput = value;
+								const matchesPreset = STORY_TYPES.some((story) => story.prompt === value);
+								if (!matchesPreset) {
+									selectedStoryTypeId = null;
+								}
+							}}
+							placeholder={defaultStoryType.prompt}
+							type="text"
+							required
+						/>
+						<p class="text-xs text-secondary-slate/80">
+							We send this text to the automation as the <code>investigate</code> payload. Edit it or pick a preset below.
+						</p>
+					</div>
+					<button
+						type="submit"
+						class="inline-flex h-16 w-full items-center justify-center rounded-3xl bg-primary-electric px-8 text-sm font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-primary-electric/80 disabled:cursor-not-allowed disabled:opacity-70 lg:w-auto lg:self-stretch"
+						disabled={isLoading}
+					>
+						{#if isLoading}
+							Scanning...
+						{:else}
+							Submit idea
+						{/if}
+					</button>
+				</div>
+
+				<div class="space-y-4 rounded-2xl border border-white/60 bg-white/70 p-4">
+					<div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+						<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Hot AI story types</p>
+						<p class="text-xs text-secondary-slate/80">Tap a preset to auto-fill the investigation prompt.</p>
+					</div>
+					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{#each STORY_TYPES as story (story.id)}
+							{@const isActive = selectedStoryTypeId === story.id}
+							<button
+								type="button"
+								class={`group relative cursor-pointer overflow-hidden rounded-[1.5rem] border-2 p-5 pb-6 pt-8 text-left shadow-sm transition-all ${
+									isActive
+										? 'border-primary-electric bg-primary-electric/10 text-primary-navy shadow-xl ring-2 ring-primary-electric/40'
+										: 'border-primary-electric/30 bg-white/80 text-secondary-slate outline outline-1 outline-primary-electric/10 hover:-translate-y-0.5 hover:border-primary-electric/50 hover:bg-white hover:outline-primary-electric/30'
+								}`}
+								aria-pressed={isActive}
+								on:click={() => setStoryType(story.id)}
+							>
+								<p class="text-xs font-semibold uppercase tracking-[0.3em]">{story.title}</p>
+								<p class="mt-3 text-sm text-secondary-slate/80">{story.description}</p>
+							</button>
+						{/each}
+					</div>
+				</div>
+
 				<label class="block text-sm font-medium text-secondary-slate/90" for="webhook-url">
 					POST endpoint
 				</label>
@@ -433,18 +465,7 @@
 					type="url"
 					required
 				/>
-				<div class="flex flex-col gap-3 sm:flex-row">
-					<button
-						type="submit"
-						class="rounded-2xl bg-primary-electric px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-primary-electric/80 disabled:cursor-not-allowed disabled:opacity-70"
-						disabled={isLoading}
-					>
-						{#if isLoading}
-							Scanning...
-						{:else}
-							Submit idea
-						{/if}
-					</button>
+				<div class="flex justify-start">
 					<button
 						type="button"
 						class="rounded-2xl border border-white/60 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-primary-navy hover:border-primary-navy disabled:cursor-not-allowed disabled:opacity-70"
