@@ -1,6 +1,6 @@
 type Connection = {
 	sessionId: string;
-	controller: ReadableStreamDefaultController<string>;
+	controller: ReadableStreamDefaultController<Uint8Array>;
 };
 
 type CallbackEvent = {
@@ -12,9 +12,16 @@ type CallbackEvent = {
 
 const connections = new Map<string, Set<Connection>>();
 
+const encoder = new TextEncoder();
 const formatEvent = (event: CallbackEvent) => `data: ${JSON.stringify(event)}\n\n`;
+const enqueue = (controller: ReadableStreamDefaultController<Uint8Array>, data: string) => {
+	controller.enqueue(encoder.encode(data));
+};
 
-export const registerConnection = (sessionId: string, controller: ReadableStreamDefaultController<string>) => {
+export const registerConnection = (
+	sessionId: string,
+	controller: ReadableStreamDefaultController<Uint8Array>
+) => {
 	let controllers = connections.get(sessionId);
 
 	if (!controllers) {
@@ -26,7 +33,8 @@ export const registerConnection = (sessionId: string, controller: ReadableStream
 	controllers.add(connection);
 
 	// send immediate ack so the client knows it is listening
-	controller.enqueue(
+	enqueue(
+		controller,
 		formatEvent({
 			type: 'connected',
 			message: 'Callback stream connected',
@@ -61,7 +69,7 @@ export const publishToSession = (sessionId: string, event: Omit<CallbackEvent, '
 
 	for (const connection of controllers) {
 		try {
-			connection.controller.enqueue(payload);
+			enqueue(connection.controller, payload);
 		} catch (error) {
 			console.error('Failed to push callback event', error);
 		}

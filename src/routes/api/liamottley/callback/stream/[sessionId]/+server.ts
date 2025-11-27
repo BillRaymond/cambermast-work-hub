@@ -8,17 +8,33 @@ export const GET: RequestHandler = async ({ params }) => {
 		return new Response('Missing session id', { status: 400 });
 	}
 
-	const stream = new ReadableStream<string>({
-		start(controller) {
-			const connection = registerConnection(sessionId, controller);
-			controller.enqueue(':\n\n'); // comment keeps the stream open
+	const encoder = new TextEncoder();
+	let connection: ReturnType<typeof registerConnection> | null = null;
+	let keepAlive: ReturnType<typeof setInterval> | null = null;
 
-			return () => {
-				unregisterConnection(connection);
-			};
+	const enqueueComment = () => {
+		try {
+			connection?.controller.enqueue(encoder.encode(':\n\n'));
+		} catch (error) {
+			console.error('Unable to enqueue keep-alive comment', error);
+		}
+	};
+
+	const stream = new ReadableStream<Uint8Array>({
+		start(controller) {
+			connection = registerConnection(sessionId, controller);
+			enqueueComment();
+			keepAlive = setInterval(enqueueComment, 15000);
 		},
 		cancel() {
-			// handled via return in start
+			if (keepAlive) {
+				clearInterval(keepAlive);
+				keepAlive = null;
+			}
+			if (connection) {
+				unregisterConnection(connection);
+				connection = null;
+			}
 		}
 	});
 
