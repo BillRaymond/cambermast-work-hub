@@ -19,3 +19,4 @@ export default defineConfig({
 		allowedHosts: ['w.cambermast.com']
 	}
 });
+
