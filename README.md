@@ -40,6 +40,12 @@ Stick to these tokens and your sub-sites will always align with cambermast.com.
 - `src/routes/+page.svelte` renders the lightweight Cambermast Work Hub overview with the contact link.
 - `src/routes/liamottley/+page.svelte` acts as the dedicated Liam Ottley subsite and can be iterated on without touching other routes.
 
+## Running locally
+If you need to access this site from another device on your network, you can use Tailscale to expose the local development server:
+```
+tailscale serve --tcp=5173 tcp://localhost:5173
+```
+
 ---
 
 _Automated deploy test note – safe to remove once validated._

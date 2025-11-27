@@ -1,8 +1,8 @@
 <svelte:head>
-	<title>Liam Ottley · Cambermast Work Hub</title>
+	<title>Liam Ottley · AI News Sprint Log</title>
 	<meta
 		name="description"
-		content="Progress tracker for the Liam Ottley collaboration inside the Cambermast Work Hub."
+		content="Live progress tracker for the Hostinger × n8n hackathon build that Liam Ottley and Cambermast are shipping."
 	/>
 </svelte:head>
 
@@ -10,6 +10,8 @@
 	import { browser } from '$app/environment';
 	import type { PageData } from './$types';
 	import { onDestroy } from 'svelte';
+	import { flip } from 'svelte/animate';
+	import { quintOut } from 'svelte/easing';
 
 	type Step = {
 		id: string;
@@ -19,21 +21,234 @@
 		timestamp: string;
 	};
 
+	type PhaseStatus = 'pending' | 'active' | 'done';
+	type PhaseDefinition = {
+		id: string;
+		title: string;
+		description: string;
+		emoji: string;
+	};
+	type PhaseState = PhaseDefinition & {
+		status: PhaseStatus;
+		note?: string;
+	};
+
 	export let data: PageData;
 
 	const defaultUrl = 'https://n8n.cambermast.com/webhook-test/2999c2ae-9b07-40be-ae0e-8ae5bb56090b';
-	const investigateValue = 'Latest AI News';
+	const STORY_TYPES = [
+		{
+			id: 'latest',
+			title: 'Latest AI News',
+			description: 'Fresh drops from the labs, feeds, and rumor mills.',
+			prompt: 'Latest AI News'
+		},
+		{
+			id: 'policy',
+			title: 'AI Policy Watch',
+			description: 'Regulation, compliance shake-ups, and global policy shifts.',
+			prompt: 'AI policy and regulation news'
+		},
+		{
+			id: 'product',
+			title: 'Breakout Product Launches',
+			description: 'New tools, AI assistants, and platform launches landing this week.',
+			prompt: 'New AI product launches worth covering'
+		},
+		{
+			id: 'research',
+			title: 'Research Signals',
+			description: 'Labs, arXiv, and stealth research that could spark a video.',
+			prompt: 'Cutting-edge AI research stories'
+		},
+		{
+			id: 'creator',
+			title: 'Creator & Community Hype',
+			description: 'Stories bubbling up from X, Discord, and indie builders.',
+			prompt: 'Creator-led AI trends'
+		}
+	] as const;
+	type StoryType = (typeof STORY_TYPES)[number];
+	const defaultStoryType = STORY_TYPES[0];
 
 	const derivedCallbackUrl = `${data.callbackBaseUrl}/api/liamottley/callback/${data.sessionId}`;
 	const callbackStreamUrl = `${data.callbackBaseUrl}/api/liamottley/callback/stream/${data.sessionId}`;
 
+	const PHASE_BLUEPRINT: PhaseDefinition[] = [
+		{
+			id: 'briefing-desk',
+			title: 'AI Briefing Desk',
+			description: 'Summarize the strongest stories into a digestible newsroom recap.',
+			emoji: '🗞️'
+		},
+		{
+			id: 'idea-lab',
+			title: 'Idea Lab',
+			description: 'Score trend potential and surface validated hooks for content/video.',
+			emoji: '💡'
+		},
+		{
+			id: 'handoff',
+			title: 'Delivery & Callback',
+			description: 'Package the article + callback payload so the site can showcase it.',
+			emoji: '🚀'
+		}
+	];
+
+	const baseStatusCopy = {
+		headline: 'Awaiting automation run',
+		detail: 'Trigger the POST tester below to watch each stage of the hackathon build sync in real time.',
+		highlight: 'AI news aggregator sprint log',
+		idea: 'Idea lab warming up with trend data'
+	};
+
+	const createPhaseState = (): PhaseState[] =>
+		PHASE_BLUEPRINT.map((phase, index) => ({
+			...phase,
+			status: index === 0 ? 'active' : 'pending'
+		}));
+
+	const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
+	const asRecord = (value: unknown): Record<string, unknown> | null =>
+		typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+	const getString = (value: unknown) => (typeof value === 'string' && value.trim().length > 0 ? value.trim() : null);
+	const maybeNumber = (value: unknown) => {
+		if (typeof value === 'number' && Number.isFinite(value)) return value;
+		if (typeof value === 'string') {
+			const parsed = Number.parseFloat(value);
+			return Number.isFinite(parsed) ? parsed : null;
+		}
+		return null;
+	};
+
+	const normalizePhaseStatus = (value: string | null): PhaseStatus | null => {
+		if (!value) return null;
+		const normalized = value.toLowerCase();
+		if (['complete', 'completed', 'done', 'finished'].includes(normalized)) return 'done';
+		if (['active', 'running', 'in_progress', 'live'].includes(normalized)) return 'active';
+		if (['pending', 'waiting', 'queued', 'up_next'].includes(normalized)) return 'pending';
+		return null;
+	};
+
 	let targetUrl = defaultUrl;
 	let callbackUrl = derivedCallbackUrl;
+	let selectedStoryTypeId: StoryType['id'] = defaultStoryType.id;
+	let investigateInput: string = defaultStoryType.prompt;
 	let isLoading = false;
 	let latestResponse = '';
 	let errorMessage = '';
 	let steps: Step[] = [];
 	let eventSource: EventSource | null = null;
+
+	let phases = createPhaseState();
+	let statusHeadline = baseStatusCopy.headline;
+	let statusDetail = baseStatusCopy.detail;
+	let highlightIdea = baseStatusCopy.highlight;
+	let statusIdea = baseStatusCopy.idea;
+	let callbackCount = 0;
+	let lastCallbackAt: string | null = null;
+	let progressOverride: number | null = null;
+
+	const setIdleStatus = () => {
+		phases = createPhaseState();
+		callbackCount = 0;
+		lastCallbackAt = null;
+		progressOverride = null;
+		statusHeadline = baseStatusCopy.headline;
+		statusDetail = baseStatusCopy.detail;
+		statusIdea = baseStatusCopy.idea;
+		highlightIdea = baseStatusCopy.highlight;
+	};
+
+	const prepareForRun = () => {
+		phases = createPhaseState();
+		callbackCount = 0;
+		lastCallbackAt = null;
+		progressOverride = null;
+		statusHeadline = 'Automation run armed';
+		statusDetail = 'Listening for the first callback from the n8n workflow.';
+		statusIdea = baseStatusCopy.idea;
+		highlightIdea = baseStatusCopy.highlight;
+	};
+
+	setIdleStatus();
+
+	const progressFromPhases = (currentPhases: PhaseState[]) => {
+		const slice = currentPhases.length > 0 ? 100 / currentPhases.length : 0;
+		return currentPhases.reduce((value, phase) => {
+			if (phase.status === 'done') return value + slice;
+			if (phase.status === 'active') return value + slice * 0.6;
+			return value;
+		}, 0);
+	};
+
+	const handleAutomationSignal = (payload: unknown) => {
+		const record = asRecord(payload);
+		if (!record) return;
+
+		const headline = getString(record.headline ?? record.status ?? record.title);
+		if (headline) {
+			statusHeadline = headline;
+		}
+
+		const detail = getString(record.summary ?? record.detail ?? record.description);
+		if (detail) {
+			statusDetail = detail;
+		}
+
+		const nextIdea = getString(record.idea ?? record.nextIdea ?? record.videoIdea);
+		if (nextIdea) {
+			statusIdea = nextIdea;
+		}
+
+		const highlight = getString(record.highlight ?? record.keyInsight ?? record.heroLine);
+		if (highlight) {
+			highlightIdea = highlight;
+		}
+
+		const progressValue = maybeNumber(record.progress ?? record.percentComplete ?? record.completion);
+		if (progressValue !== null) {
+			progressOverride = clamp(Math.round(progressValue));
+		}
+
+		const phaseToken = getString(
+			(record.phase as string | undefined) ??
+				(record.stage as string | undefined) ??
+				(record.phaseId as string | undefined)
+		);
+
+		if (phaseToken) {
+			const targetIndex = phases.findIndex(
+				(phase) => phase.id === phaseToken || phase.title.toLowerCase() === phaseToken.toLowerCase()
+			);
+
+			if (targetIndex !== -1) {
+				const incomingStatus =
+					normalizePhaseStatus(
+						getString((record.phaseStatus as string | undefined) ?? (record.state as string | undefined))
+					) ?? 'active';
+
+				const note =
+					getString(
+						(record.phaseNote as string | undefined) ??
+							(record.note as string | undefined) ??
+							(record.summary as string | undefined)
+					 ) ?? undefined;
+
+				phases = phases.map((phase, index) => {
+					if (index < targetIndex) {
+						return { ...phase, status: 'done' };
+					}
+
+					if (index === targetIndex) {
+						return { ...phase, status: incomingStatus, note };
+					}
+
+					return { ...phase, status: 'pending' };
+				});
+			}
+		}
+	};
 
 	const pushStep = (message: string, detail?: string, kind: Step['kind'] = 'info') => {
 		const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -69,6 +284,12 @@
 					pushStep(data.message ?? 'Callback listener ready', undefined, 'success');
 				} else {
 					pushStep(data.message ?? 'Callback update received', detail);
+
+					if (data.type === 'callback') {
+						callbackCount += 1;
+						lastCallbackAt = new Date().toISOString();
+						handleAutomationSignal(data.payload);
+					}
 				}
 			} catch (error) {
 				console.error('Failed to parse callback stream event', error);
@@ -90,12 +311,15 @@
 	}
 
 	const runPost = async () => {
+		const ideaToInvestigate = investigateInput.trim() || defaultStoryType.prompt;
 		isLoading = true;
 		latestResponse = '';
 		errorMessage = '';
 
+		prepareForRun();
+
 		const payload = JSON.stringify({
-			investigate: investigateValue,
+			investigate: ideaToInvestigate,
 			callbackUrl
 		});
 
@@ -127,104 +351,129 @@
 			pushStep('POST run complete', undefined, errorMessage ? 'error' : 'success');
 		}
 	};
+
+	const setStoryType = (storyId: StoryType['id']) => {
+		selectedStoryTypeId = storyId;
+		const matched = STORY_TYPES.find((story) => story.id === storyId);
+		if (matched) {
+			investigateInput = matched.prompt;
+		}
+	};
+
+	$: investigatePreviewValue = investigateInput.trim() || defaultStoryType.prompt;
+	$: computedProgress = progressOverride ?? Math.round(progressFromPhases(phases));
+	$: progressDegrees = (computedProgress / 100) * 360;
+	$: progressRingStyle = `background: conic-gradient(#3DDBA7 ${progressDegrees}deg, rgba(255, 255, 255, 0.2) 0deg)`;
+	$: currentPhase = phases.find((phase) => phase.status === 'active') ?? phases.find((phase) => phase.status !== 'done') ?? phases[phases.length - 1];
+	$: lastCallbackLabel = lastCallbackAt
+		? new Date(lastCallbackAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+		: 'No callback yet';
 </script>
 
 <article class="space-y-10">
 	<section class="section-shell border border-white/50">
 		<div class="space-y-6">
 			<div class="space-y-2">
-				<h1 class="text-4xl font-semibold text-primary-navy">Liam Ottley · Webhook tester</h1>
+				<p class="badge bg-primary-electric/10 text-primary-electric">Webhook console</p>
+				<h2 class="text-2xl font-semibold text-primary-navy">Trigger a POST + watch the callbacks roll in</h2>
 				<p class="text-secondary-slate/90">
-					Enter a POST endpoint, trigger it, and inspect the response without leaving this route. The field
-					defaults to the testing webhook we use for Cambermast automation dry runs.
+					Enter a POST endpoint, trigger it, and inspect the response without leaving this route. The field defaults to
+					the testing webhook we use for Cambermast automation dry runs.
 				</p>
 			</div>
 
-				<form class="space-y-4" on:submit|preventDefault={runPost}>
-					<label class="block text-sm font-medium text-secondary-slate/90" for="webhook-url">
-						POST endpoint
-					</label>
-					<input
-						id="webhook-url"
-						name="webhook-url"
-						class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
-						bind:value={targetUrl}
-						placeholder="https://example.com/webhook"
-						type="url"
-						required
-					/>
-					<div class="flex gap-3">
-						<button
-							type="submit"
-							class="rounded-2xl bg-primary-electric px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-primary-electric/80 disabled:cursor-not-allowed disabled:opacity-70"
-							disabled={isLoading}
-						>
-							{#if isLoading}
-								Sending...
-							{:else}
-								Run POST
-							{/if}
-						</button>
+			<div class="space-y-4 rounded-2xl border border-white/60 bg-white/70 p-4">
+				<div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+					<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Hot AI story types</p>
+					<p class="text-xs text-secondary-slate/80">Tap a preset to auto-fill the investigation prompt.</p>
+				</div>
+				<div class="grid gap-3 md:grid-cols-2">
+					{#each STORY_TYPES as story (story.id)}
 						<button
 							type="button"
-							class="rounded-2xl border border-white/60 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-primary-navy hover:border-primary-navy"
-							on:click={() => (targetUrl = defaultUrl)}
-							disabled={isLoading || targetUrl === defaultUrl}
+							class={`rounded-2xl border p-4 text-left transition ${
+								selectedStoryTypeId === story.id
+									? 'border-primary-electric bg-primary-electric/10 text-primary-navy shadow-card'
+									: 'border-white/60 bg-white text-secondary-slate hover:border-primary-electric/40'
+							}`}
+							on:click={() => setStoryType(story.id)}
 						>
-							Reset URL
+							<p class="text-sm font-semibold uppercase tracking-[0.3em]">{story.title}</p>
+							<p class="mt-2 text-sm text-secondary-slate/80">{story.description}</p>
 						</button>
-					</div>
-					<label class="block text-sm font-medium text-secondary-slate/90" for="callback-url">
-						Callback URL
-					</label>
-					<input
-						id="callback-url"
-						name="callback-url"
-						class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
-						bind:value={callbackUrl}
-						placeholder="https://example.com/callback"
-						type="url"
-					/>
-				</form>
-
-				<div class="rounded-2xl border border-white/60 bg-white/60 p-4 text-sm text-secondary-slate/90">
-					<p class="font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Payload preview</p>
-					<pre class="mt-3 overflow-auto rounded-xl bg-black/80 p-4 text-white">
-{JSON.stringify({ investigate: investigateValue, callbackUrl }, null, 2)}
-					</pre>
+					{/each}
 				</div>
 			</div>
-		</section>
 
-	<section class="section-shell border border-white/50">
-		<h2 class="text-sm font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Run activity</h2>
-		{#if steps.length === 0}
-			<p class="mt-4 text-secondary-slate/80">Trigger a POST to watch each step appear here.</p>
-		{:else}
-			<ul class="mt-4 space-y-3">
-				{#each steps as step (step.id)}
-					<li
-						class={`rounded-2xl border p-4 ${
-							step.kind === 'error'
-								? 'border-semantic-warning/50 bg-semantic-warning/10 text-semantic-warning'
-								: step.kind === 'success'
-									? 'border-accent-mint/40 bg-accent-mint/10 text-primary-navy'
-									: 'border-white/60 bg-white/70 text-primary-navy'
-						}`}
+			<form class="space-y-4" on:submit|preventDefault={runPost}>
+				<label class="block text-sm font-medium text-secondary-slate/90" for="investigate-prompt">
+					Story signal to investigate
+				</label>
+				<input
+					id="investigate-prompt"
+					name="investigate-prompt"
+					class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
+					bind:value={investigateInput}
+					placeholder="Latest AI News"
+					type="text"
+					required
+				/>
+				<p class="text-xs text-secondary-slate/80">
+					We send this text to the automation as the <code>investigate</code> payload. Edit it or pick a preset above.
+				</p>
+				<label class="block text-sm font-medium text-secondary-slate/90" for="webhook-url">
+					POST endpoint
+				</label>
+				<input
+					id="webhook-url"
+					name="webhook-url"
+					class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
+					bind:value={targetUrl}
+					placeholder="https://example.com/webhook"
+					type="url"
+					required
+				/>
+				<div class="flex flex-col gap-3 sm:flex-row">
+					<button
+						type="submit"
+						class="rounded-2xl bg-primary-electric px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-primary-electric/80 disabled:cursor-not-allowed disabled:opacity-70"
+						disabled={isLoading}
 					>
-						<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">
-							{new Date(step.timestamp).toLocaleTimeString()}
-						</p>
-						<p class="mt-1 font-semibold">{step.message}</p>
-						{#if step.detail}
-							<pre class="mt-2 overflow-auto rounded-xl bg-black/80 p-3 text-xs text-white">
-{step.detail}
-							</pre>
+						{#if isLoading}
+							Scanning...
+						{:else}
+							Submit idea
 						{/if}
-					</li>
-				{/each}
-			</ul>
-		{/if}
+					</button>
+					<button
+						type="button"
+						class="rounded-2xl border border-white/60 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-primary-navy hover:border-primary-navy disabled:cursor-not-allowed disabled:opacity-70"
+						on:click={() => (targetUrl = defaultUrl)}
+						disabled={isLoading || targetUrl === defaultUrl}
+					>
+						Reset URL
+					</button>
+				</div>
+				<label class="block text-sm font-medium text-secondary-slate/90" for="callback-url">
+					Callback URL
+				</label>
+				<input
+					id="callback-url"
+					name="callback-url"
+					class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
+					bind:value={callbackUrl}
+					placeholder="https://example.com/callback"
+					type="url"
+				/>
+			</form>
+
+			<div class="rounded-2xl border border-white/60 bg-white/60 p-4 text-sm text-secondary-slate/90">
+				<p class="font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Payload preview</p>
+				<pre class="mt-3 overflow-auto rounded-xl bg-black/80 p-4 text-white">
+{JSON.stringify({ investigate: investigatePreviewValue, callbackUrl }, null, 2)}
+				</pre>
+			</div>
+		</div>
 	</section>
 
 	<section class="section-shell border border-white/40">
@@ -245,5 +494,113 @@
 				<p class="mt-4 text-secondary-slate/80">No responses yet. Run a POST to see the payload here.</p>
 			{/if}
 		{/if}
+	</section>
+
+	<section class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+		<div class="section-shell border border-primary-navy/15">
+			<p class="text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Live status</p>
+			<h2 class="mt-2 text-2xl font-semibold text-primary-navy">{statusHeadline}</h2>
+			<p class="mt-3 text-secondary-slate/90">{statusDetail}</p>
+
+			<div class="mt-6 rounded-2xl border border-white/60 bg-white/70 p-4">
+				<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Highlight</p>
+				<p class="mt-2 text-lg font-semibold text-primary-navy">{highlightIdea}</p>
+				<p class="mt-1 text-sm text-secondary-slate">{statusIdea}</p>
+			</div>
+		</div>
+
+		<div class="section-shell border border-primary-navy/15">
+			<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Current phase</p>
+			<p class="mt-2 text-xl font-semibold text-primary-navy">{currentPhase?.title}</p>
+			<p class="text-sm text-secondary-slate/90">{currentPhase?.description}</p>
+		</div>
+	</section>
+
+	<section class="section-shell border border-primary-navy/15">
+		<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+			<div>
+				<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Automation roadmap</p>
+				<h2 class="text-2xl font-semibold text-primary-navy">From data ambient to published insight</h2>
+			</div>
+			<p class="text-sm font-semibold text-primary-electric">{computedProgress}% of this run is already staged.</p>
+		</div>
+
+		<div class="mt-6 grid gap-4 md:grid-cols-2">
+			{#each phases as phase (phase.id)}
+				<article
+					class={`rounded-2xl border p-4 transition ${
+						phase.status === 'done'
+							? 'border-accent-mint/50 bg-accent-mint/10 text-primary-navy'
+							: phase.status === 'active'
+								? 'border-primary-electric/40 bg-primary-electric/5 text-primary-navy'
+								: 'border-white/60 bg-white/70 text-secondary-slate'
+					}`}
+					animate:flip={{ duration: 400, easing: quintOut }}
+				>
+					<div class="flex items-center justify-between">
+						<p class="text-2xl">{phase.emoji}</p>
+						<p class={`text-xs font-semibold uppercase tracking-[0.3em] ${
+							phase.status === 'done'
+								? 'text-accent-mint'
+								: phase.status === 'active'
+									? 'text-primary-electric'
+									: 'text-secondary-slate/70'
+						}`}
+						>
+							{phase.status === 'done' ? 'Complete' : phase.status === 'active' ? 'In motion' : 'Queued'}
+						</p>
+					</div>
+					<h3 class="mt-3 text-xl font-semibold text-primary-navy">{phase.title}</h3>
+					<p class="text-sm text-secondary-slate/90">{phase.description}</p>
+					{#if phase.note}
+						<p class="mt-2 text-sm font-semibold text-primary-navy">{phase.note}</p>
+					{/if}
+				</article>
+			{/each}
+		</div>
+	</section>
+
+	<section class="section-shell border border-white/50">
+		<h2 class="text-sm font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Live run activity</h2>
+		{#if steps.length === 0}
+			<p class="mt-4 text-secondary-slate/80">Trigger a POST to watch each step appear here.</p>
+		{:else}
+			<ul class="mt-4 space-y-3">
+				{#each steps as step (step.id)}
+					<li
+						class={`rounded-2xl border p-4 transition ${
+							step.kind === 'error'
+								? 'border-semantic-warning/50 bg-semantic-warning/10 text-semantic-warning'
+								: step.kind === 'success'
+									? 'border-accent-mint/40 bg-accent-mint/10 text-primary-navy'
+									: 'border-white/60 bg-white/70 text-primary-navy'
+						}`}
+						animate:flip={{ duration: 350, easing: quintOut }}
+					>
+						<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">
+							{new Date(step.timestamp).toLocaleTimeString()}
+						</p>
+						<p class="mt-1 font-semibold">{step.message}</p>
+						{#if step.detail}
+							<pre class="mt-2 overflow-auto rounded-xl bg-black/80 p-3 text-xs text-white">
+{step.detail}
+							</pre>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section class="section-shell border border-primary-navy/15">
+		<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Callbacks received</p>
+		<p class="mt-2 text-4xl font-semibold text-primary-navy">{callbackCount}</p>
+		<p class="text-sm text-secondary-slate">Latest ping: {lastCallbackLabel}</p>
+		<div class="mt-4 h-2 rounded-full bg-secondary-cool">
+			<div
+				class="h-full rounded-full bg-gradient-to-r from-primary-electric to-accent-mint transition-all"
+				style={`width: ${Math.min(100, Math.max(0, computedProgress))}%`}
+			></div>
+		</div>
 	</section>
 </article>
