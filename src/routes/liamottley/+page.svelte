@@ -80,17 +80,11 @@
 	const derivedCallbackUrl = `${data.callbackBaseUrl}/api/liamottley/callback/${data.sessionId}`;
 	const callbackStreamUrl = `${data.callbackBaseUrl}/api/liamottley/callback/stream/${data.sessionId}`;
 
-	const PHASE_BLUEPRINT: PhaseDefinition[] = [
-		{
-			id: 'briefing-desk',
-			title: 'AI Briefing Desk',
-			description: 'Summarize the strongest stories into a digestible newsroom recap.',
-			emoji: '🗞️'
-		},
-		{
-			id: 'idea-lab',
-			title: 'Idea Lab',
-			description: 'Score trend potential and surface validated hooks for content/video.',
+		const PHASE_BLUEPRINT: PhaseDefinition[] = [
+			{
+				id: 'idea-lab',
+				title: 'Idea Lab',
+				description: 'Score trend potential and surface validated hooks for content/video.',
 			emoji: '💡'
 		},
 		{
@@ -171,7 +165,7 @@
 		callbackCount = 0;
 		lastCallbackAt = null;
 		progressOverride = null;
-		statusHeadline = 'Automation run armed';
+		statusHeadline = 'Listening for workflow callbacks';
 		statusDetail = 'Listening for the first callback from the n8n workflow.';
 		statusIdea = baseStatusCopy.idea;
 		highlightIdea = baseStatusCopy.highlight;
@@ -365,13 +359,13 @@
 			investigateInput = matched.prompt;
 		}
 	};
-
-	const handleInvestigateInput = (event: Event) => {
-		const value = (event.currentTarget as HTMLInputElement).value;
-		investigateInput = value;
-		const matched = STORY_TYPES.find((story) => story.prompt === value);
-		selectedStoryTypeId = matched ? matched.id : null;
-	};
+	$: {
+		const matched = STORY_TYPES.find((story) => story.prompt === investigateInput);
+		const nextId = matched ? matched.id : null;
+		if (nextId !== selectedStoryTypeId) {
+			selectedStoryTypeId = nextId;
+		}
+	}
 
 	$: investigatePreviewValue = investigateInput.trim() || defaultStoryType.prompt;
 	$: computedProgress = progressOverride ?? Math.round(progressFromPhases(phases));
@@ -406,7 +400,6 @@
 							name="investigate-prompt"
 							class="h-16 w-full rounded-3xl border-2 border-primary-electric/60 bg-white px-6 text-lg font-semibold text-primary-navy shadow-card focus:border-primary-electric focus:outline-none"
 							bind:value={investigateInput}
-							on:input={handleInvestigateInput}
 							placeholder={defaultStoryType.prompt}
 							type="text"
 							required
@@ -538,11 +531,10 @@
 	</section>
 
 	<section class="section-shell border border-primary-navy/15">
-		<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-			<div>
-				<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Automation roadmap</p>
-				<h2 class="text-2xl font-semibold text-primary-navy">From data ambient to published insight</h2>
-			</div>
+			<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+				<div>
+					<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Automation roadmap</p>
+				</div>
 			<p class="text-sm font-semibold text-primary-electric">{computedProgress}% of this run is already staged.</p>
 		</div>
 
