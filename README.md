@@ -39,3 +39,7 @@ Stick to these tokens and your sub-sites will always align with cambermast.com.
 
 - `src/routes/+page.svelte` renders the lightweight Cambermast Work Hub overview with the contact link.
 - `src/routes/liamottley/+page.svelte` acts as the dedicated Liam Ottley subsite and can be iterated on without touching other routes.
+
+---
+
+_Automated deploy test note – safe to remove once validated._
