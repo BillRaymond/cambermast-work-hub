@@ -28,5 +28,8 @@
 				<span aria-hidden="true">↗</span>
 			</a>
 		</div>
+		<p class="text-xs text-secondary-slate/80">
+			Deployment test: 2025-11-27 17:05 UTC — safe to remove once validated.
+		</p>
 	</div>
 </section>
