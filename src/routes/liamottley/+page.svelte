@@ -366,6 +366,13 @@
 		}
 	};
 
+	const handleInvestigateInput = (event: Event) => {
+		const value = (event.currentTarget as HTMLInputElement).value;
+		investigateInput = value;
+		const matched = STORY_TYPES.find((story) => story.prompt === value);
+		selectedStoryTypeId = matched ? matched.id : null;
+	};
+
 	$: investigatePreviewValue = investigateInput.trim() || defaultStoryType.prompt;
 	$: computedProgress = progressOverride ?? Math.round(progressFromPhases(phases));
 	$: progressDegrees = (computedProgress / 100) * 360;
@@ -398,15 +405,8 @@
 							id="investigate-prompt"
 							name="investigate-prompt"
 							class="h-16 w-full rounded-3xl border-2 border-primary-electric/60 bg-white px-6 text-lg font-semibold text-primary-navy shadow-card focus:border-primary-electric focus:outline-none"
-							value={investigateInput}
-							on:input={(event) => {
-								const value = (event.currentTarget as HTMLInputElement).value;
-								investigateInput = value;
-								const matchesPreset = STORY_TYPES.some((story) => story.prompt === value);
-								if (!matchesPreset) {
-									selectedStoryTypeId = null;
-								}
-							}}
+							bind:value={investigateInput}
+							on:input={handleInvestigateInput}
 							placeholder={defaultStoryType.prompt}
 							type="text"
 							required
