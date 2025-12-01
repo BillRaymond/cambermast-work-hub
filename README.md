@@ -6,6 +6,7 @@ This is the SvelteKit site that powers the Cambermast Work Hub. It now functions
 
 - **SvelteKit + SSR** so every route can hydrate with data from Postgres, n8n, or Django.
 - **TypeScript strict** enforced via `npm run check`.
+- **ARIA-first patterns** ensure shared components stay accessible by default.
 - **Tailwind CSS** with the Cambermast palette, typography tokens, and helper utilities defined in `tailwind.config.ts`.
 - **Prettier-ready** thanks to the default SvelteKit tooling (`npm run format` if you enable it later).
 

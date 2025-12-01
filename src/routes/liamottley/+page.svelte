@@ -363,6 +363,7 @@
 
 	$: investigatePreviewValue = investigateInput.trim() || defaultStoryType.prompt;
 	$: computedProgress = progressOverride ?? Math.round(progressFromPhases(phases));
+	$: clampedProgress = Math.min(100, Math.max(0, computedProgress));
 	$: progressDegrees = (computedProgress / 100) * 360;
 	$: progressRingStyle = `background: conic-gradient(#3DDBA7 ${progressDegrees}deg, rgba(255, 255, 255, 0.2) 0deg)`;
 	$: currentPhase = phases.find((phase) => phase.status === 'active') ?? phases.find((phase) => phase.status !== 'done') ?? phases[phases.length - 1];
@@ -391,7 +392,10 @@
 				</p>
 			</div>
 
-			<form class="space-y-4" on:submit|preventDefault={runPost}>
+			<form class="space-y-4" on:submit|preventDefault={runPost} aria-describedby="post-run-tip">
+				<p id="post-run-tip" class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">
+					Fill every input before triggering the workflow POST.
+				</p>
 				<label class="block text-sm font-medium text-secondary-slate/90" for="investigate-prompt">
 					Story signal to investigate
 				</label>
@@ -405,8 +409,9 @@
 							placeholder={defaultStoryType.prompt}
 							type="text"
 							required
+							aria-describedby="investigate-help"
 						/>
-						<p class="text-xs text-secondary-slate/80">
+						<p id="investigate-help" class="text-xs text-secondary-slate/80">
 							We send this text to the automation as the <code>investigate</code> payload. Edit it or pick a preset below.
 						</p>
 					</div>
@@ -423,30 +428,35 @@
 					</button>
 				</div>
 
-				<div class="space-y-4 rounded-2xl border border-white/60 bg-white/70 p-4">
-					<div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-						<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Hot AI story types</p>
-						<p class="text-xs text-secondary-slate/80">Tap a preset to auto-fill the investigation prompt.</p>
-					</div>
-					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				<fieldset class="space-y-4 rounded-2xl border border-white/60 bg-white/70 p-4" aria-describedby="story-type-tip">
+					<legend class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Hot AI story types</legend>
+					<p id="story-type-tip" class="text-xs text-secondary-slate/80">
+						Choose a preset to auto-fill the investigation prompt with a known-good signal.
+					</p>
+					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label="Suggested investigation presets">
 						{#each STORY_TYPES as story (story.id)}
 							{@const isActive = selectedStoryTypeId === story.id}
-							<button
-								type="button"
-								class={`group relative cursor-pointer overflow-hidden rounded-[1.5rem] border-2 p-5 pb-6 pt-8 text-left shadow-sm transition-all ${
+							<label
+								class={`group relative block cursor-pointer overflow-hidden rounded-[1.5rem] border-2 p-5 pb-6 pt-8 text-left shadow-sm transition-all ${
 									isActive
 										? 'border-primary-electric bg-primary-electric/10 text-primary-navy shadow-xl ring-2 ring-primary-electric/40'
 										: 'border-primary-electric/30 bg-white/80 text-secondary-slate outline outline-1 outline-primary-electric/10 hover:-translate-y-0.5 hover:border-primary-electric/50 hover:bg-white hover:outline-primary-electric/30'
 								}`}
-								aria-pressed={isActive}
-								on:click={() => setStoryType(story.id)}
 							>
-								<p class="text-xs font-semibold uppercase tracking-[0.3em]">{story.title}</p>
+								<input
+									type="radio"
+									class="sr-only"
+									name="story-type"
+									value={story.id}
+									checked={isActive}
+									on:change={() => setStoryType(story.id)}
+								/>
+								<span class="text-xs font-semibold uppercase tracking-[0.3em]">{story.title}</span>
 								<p class="mt-3 text-sm text-secondary-slate/80">{story.description}</p>
-							</button>
+							</label>
 						{/each}
 					</div>
-				</div>
+				</fieldset>
 
 				<label class="block text-sm font-medium text-secondary-slate/90" for="webhook-url">
 					POST endpoint
@@ -459,7 +469,11 @@
 					placeholder="https://example.com/webhook"
 					type="url"
 					required
+					aria-describedby="webhook-tip"
 				/>
+				<p id="webhook-tip" class="text-xs text-secondary-slate/80">
+					Provide the HTTPS endpoint that receives the POST. Use Reset URL to switch back to Cambermast's test hook.
+				</p>
 				<div class="flex justify-start">
 					<button
 						type="button"
@@ -480,7 +494,11 @@
 					bind:value={callbackUrl}
 					placeholder="https://example.com/callback"
 					type="url"
+					aria-describedby="callback-tip"
 				/>
+				<p id="callback-tip" class="text-xs text-secondary-slate/80">
+					This optional URL receives workflow callbacks. We pre-fill it with your session-aware stream endpoint.
+				</p>
 			</form>
 
 			<div class="rounded-2xl border border-white/60 bg-white/60 p-4 text-sm text-secondary-slate/90">
@@ -492,13 +510,24 @@
 		</div>
 	</section>
 
-	<section class="section-shell border border-white/40">
-		<h2 class="text-sm font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Latest response</h2>
+	<section
+		class="section-shell border border-white/40"
+		aria-labelledby="latest-response-title"
+		aria-live="polite"
+		aria-atomic="true"
+		aria-busy={isLoading}
+	>
+		<h2 id="latest-response-title" class="text-sm font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">
+			Latest response
+		</h2>
 		{#if isLoading}
 			<p class="mt-4 text-secondary-slate/90">Waiting for the server to respond...</p>
 		{:else}
 			{#if errorMessage}
-				<p class="mt-4 rounded-2xl border border-semantic-warning/40 bg-semantic-warning/10 p-4 text-semantic-warning">
+				<p
+					role="alert"
+					class="mt-4 rounded-2xl border border-semantic-warning/40 bg-semantic-warning/10 p-4 text-semantic-warning"
+				>
 					{errorMessage}
 				</p>
 			{/if}
@@ -513,10 +542,22 @@
 	</section>
 
 	<section class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-		<div class="section-shell border border-primary-navy/15">
-			<p class="text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Live status</p>
-			<h2 class="mt-2 text-2xl font-semibold text-primary-navy">{statusHeadline}</h2>
-			<p class="mt-3 text-secondary-slate/90">{statusDetail}</p>
+		<div
+			class="section-shell border border-primary-navy/15"
+			role="region"
+			aria-live="polite"
+			aria-labelledby="live-status-heading"
+		>
+			<h2
+				id="live-status-heading"
+				class="text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/70"
+			>
+				Live status
+			</h2>
+			<p class="mt-2 text-2xl font-semibold text-primary-navy" role="status" aria-live="polite" aria-atomic="true">
+				{statusHeadline}
+			</p>
+			<p class="mt-3 text-secondary-slate/90" aria-live="polite" aria-atomic="true">{statusDetail}</p>
 
 			<div class="mt-6 rounded-2xl border border-white/60 bg-white/70 p-4">
 				<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Highlight</p>
@@ -525,22 +566,46 @@
 			</div>
 		</div>
 
-		<div class="section-shell border border-primary-navy/15">
-			<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Current phase</p>
-			<p class="mt-2 text-xl font-semibold text-primary-navy">{currentPhase?.title}</p>
-			<p class="text-sm text-secondary-slate/90">{currentPhase?.description}</p>
+		<div
+			class="section-shell border border-primary-navy/15"
+			role="region"
+			aria-live="polite"
+			aria-labelledby="current-phase-heading"
+		>
+			<h2
+				id="current-phase-heading"
+				class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70"
+			>
+				Current phase
+			</h2>
+			<p class="mt-2 text-xl font-semibold text-primary-navy" role="status" aria-live="polite" aria-atomic="true">
+				{currentPhase?.title}
+			</p>
+			<p class="text-sm text-secondary-slate/90" aria-live="polite" aria-atomic="true">
+				{currentPhase?.description}
+			</p>
 		</div>
 	</section>
 
-	<section class="section-shell border border-primary-navy/15">
+	<section
+		class="section-shell border border-primary-navy/15"
+		aria-labelledby="automation-roadmap-heading"
+	>
 			<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
 				<div>
-					<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Automation roadmap</p>
+					<h2
+						id="automation-roadmap-heading"
+						class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70"
+					>
+						Automation roadmap
+					</h2>
 				</div>
-			<p class="text-sm font-semibold text-primary-electric">{computedProgress}% of this run is already staged.</p>
+			<p class="text-sm font-semibold text-primary-electric" aria-live="polite" aria-atomic="true">
+				{computedProgress}% of this run is already staged.
+			</p>
 		</div>
 
-		<div class="mt-6 grid gap-4 md:grid-cols-2">
+		<div class="mt-6 grid gap-4 md:grid-cols-2" role="list" aria-live="polite">
 			{#each phases as phase (phase.id)}
 				<article
 					class={`rounded-2xl border p-4 transition ${
@@ -551,6 +616,8 @@
 								: 'border-white/60 bg-white/70 text-secondary-slate'
 					}`}
 					animate:flip={{ duration: 400, easing: quintOut }}
+					role="listitem"
+					aria-label={`${phase.title} is ${phase.status}`}
 				>
 					<div class="flex items-center justify-between">
 						<p class="text-2xl">{phase.emoji}</p>
@@ -575,12 +642,26 @@
 		</div>
 	</section>
 
-	<section class="section-shell border border-white/50">
-		<h2 class="text-sm font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Live run activity</h2>
+	<section
+		class="section-shell border border-white/50"
+		aria-labelledby="live-run-activity-heading"
+	>
+		<h2
+			id="live-run-activity-heading"
+			class="text-sm font-semibold uppercase tracking-[0.3em] text-secondary-slate/70"
+		>
+			Live run activity
+		</h2>
 		{#if steps.length === 0}
 			<p class="mt-4 text-secondary-slate/80">Trigger a POST to watch each step appear here.</p>
 		{:else}
-			<ul class="mt-4 space-y-3">
+			<ul
+				class="mt-4 space-y-3"
+				role="log"
+				aria-live="polite"
+				aria-relevant="additions text"
+				aria-atomic="false"
+			>
 				{#each steps as step (step.id)}
 					<li
 						class={`rounded-2xl border p-4 transition ${
@@ -607,14 +688,30 @@
 		{/if}
 	</section>
 
-	<section class="section-shell border border-primary-navy/15">
-		<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Callbacks received</p>
-		<p class="mt-2 text-4xl font-semibold text-primary-navy">{callbackCount}</p>
-		<p class="text-sm text-secondary-slate">Latest ping: {lastCallbackLabel}</p>
-		<div class="mt-4 h-2 rounded-full bg-secondary-cool">
+	<section
+		class="section-shell border border-primary-navy/15"
+		aria-labelledby="callbacks-heading"
+	>
+		<h2 id="callbacks-heading" class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">
+			Callbacks received
+		</h2>
+		<p class="mt-2 text-4xl font-semibold text-primary-navy" role="status" aria-live="polite" aria-atomic="true">
+			{callbackCount}
+		</p>
+		<p class="text-sm text-secondary-slate" aria-live="polite" aria-atomic="true">
+			Latest ping: {lastCallbackLabel}
+		</p>
+		<div
+			class="mt-4 h-2 rounded-full bg-secondary-cool"
+			role="progressbar"
+			aria-label="Workflow completion"
+			aria-valuenow={clampedProgress}
+			aria-valuemin="0"
+			aria-valuemax="100"
+		>
 			<div
 				class="h-full rounded-full bg-gradient-to-r from-primary-electric to-accent-mint transition-all"
-				style={`width: ${Math.min(100, Math.max(0, computedProgress))}%`}
+				style={`width: ${clampedProgress}%`}
 			></div>
 		</div>
 	</section>
