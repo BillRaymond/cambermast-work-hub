@@ -34,7 +34,7 @@ jobs:
       - name: Deploy to Hostinger VPS
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host: srv914482
+          host: srv914482.hstgr.cloud
           username: billraymond
           key: ${{ secrets.DEPLOY_KEY }}
           script: |
