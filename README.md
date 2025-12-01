@@ -47,6 +47,17 @@ If you need to access this site from another device on your network, you can use
 tailscale serve --tcp=5105 tcp://localhost:5105
 ```
 
+## Remote n8n callbacks via Tailscale
+- The dev container now runs `.devcontainer/scripts/start-tailscale-serve.sh` on start. It launches `tailscaled` in userspace mode and applies `tailscale serve --tcp=5105 tcp://localhost:5105` so the remote n8n workflows can call back into your dev server automatically.
+- Set a reusable auth key on the host before reopening the container so the script can authenticate without prompts:
+  ```
+  export TAILSCALE_AUTHKEY=tskey-example123
+  export TAILSCALE_HOSTNAME=cambermast-work-hub-dev # optional label
+  ```
+  (VS Code forwards host env vars into the container because `devcontainer.json` maps them via `remoteEnv`.)
+- Logs from the helper live in `/var/log/tailscaled.log`. Run `sudo tailscale status` inside the container to confirm the session or `sudo tailscale serve status` to review the published port.
+- If you prefer to handle Tailscale manually, stop the helper (`pkill tailscaled`), run `sudo tailscale up` once, then re-run the `tailscale serve --tcp=5105 tcp://localhost:5105` command when needed.
+
 ---
 
 _Automated deploy test note – safe to remove once validated._
