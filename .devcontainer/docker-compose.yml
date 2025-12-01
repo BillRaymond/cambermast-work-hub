@@ -1,0 +1,10 @@
+services:
+  cambermast-work-hub:
+    container_name: cambermast-work-hub
+    image: cambermast-work-hub
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspaces/cambermast-work-hub:cached
+    command: /bin/sh -c "while sleep 1000; do :; done"

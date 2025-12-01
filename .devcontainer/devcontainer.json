@@ -1,6 +1,8 @@
 {
   "name": "Cambermast Work Hub",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "cambermast-work-hub",
+  "workspaceFolder": "/workspaces/cambermast-work-hub",
   "postCreateCommand": "npm install",
   "postAttachCommand": "sh -c 'if ! lsof -i :5105 -t >/dev/null; then npm run dev; else echo \"Dev server already running on port 5105\"; fi'",
   "forwardPorts": [5105],
