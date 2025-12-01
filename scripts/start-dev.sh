@@ -21,6 +21,3 @@ nohup npm run dev -- --host 0.0.0.0 --port "$PORT" > "$LOG_FILE" 2>&1 &
 PID=$!
 echo $PID > "$PID_FILE"
 echo "Started dev server on port $PORT (PID $PID). Logs: $LOG_FILE"
-
-echo "If you want to expose this dev server over Tailscale, run:"
-echo "tailscale serve --tcp=5173 tcp://localhost:5173"
