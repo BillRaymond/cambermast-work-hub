@@ -23,7 +23,7 @@ jobs:
       - name: Build and push Docker image
         run: |
           IMAGE_NAME=ghcr.io/billraymond/cambermast-work-hub/sveltekit:latest
-          docker build -t $IMAGE_NAME ./deploy/sveltekit
+          docker build -t $IMAGE_NAME .
           docker push $IMAGE_NAME
 
       - name: Deploy to VPS
