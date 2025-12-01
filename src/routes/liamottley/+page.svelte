@@ -315,6 +315,7 @@
 		isLoading = true;
 		latestResponse = '';
 		errorMessage = '';
+		steps = [];
 
 		prepareForRun();
 
