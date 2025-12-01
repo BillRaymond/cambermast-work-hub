@@ -4,6 +4,7 @@
   "service": "cambermast-work-hub",
   "workspaceFolder": "/workspaces/cambermast-work-hub",
   "postCreateCommand": "npm install",
+  "postStartCommand": "sh -c 'if command -v tailscale >/dev/null 2>&1; then tailscale serve --tcp=5105 tcp://localhost:5105; else echo \"tailscale CLI not found in container, skipping tailscale serve\"; fi'",
   "postAttachCommand": "sh -c 'if ! lsof -i :5105 -t >/dev/null; then npm run dev; else echo \"Dev server already running on port 5105\"; fi'",
   "forwardPorts": [5105],
   "customizations": {
