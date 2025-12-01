@@ -1,0 +1,40 @@
+name: Deploy SvelteKit
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_NAME=ghcr.io/${{ github.repository }}/sveltekit:latest
+          docker build -t $IMAGE_NAME ./web || docker build -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
+        # Note: Adjust path to Dockerfile if needed
+
+      - name: Deploy to Hostinger VPS
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: srv914482
+          username: billraymond
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            cd ~/homelab/sveltekit
+            docker compose pull sveltekit
+            docker compose up -d sveltekit sveltekit-on-hstgr
+            docker image prune -f
