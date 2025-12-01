@@ -40,7 +40,7 @@
 			id: 'policy',
 			title: 'AI Policy Watch',
 			description: 'Regulation, compliance shake-ups, and global policy shifts.',
-			prompt: 'AI policy and regulation news'
+			prompt: 'Regulatory battles, compliance pivots, and global governance shifts shaping AI'
 		},
 		{
 			id: 'product',
