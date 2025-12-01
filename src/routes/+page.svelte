@@ -1,3 +1,39 @@
+<script lang="ts">
+	const formattedLastDeployment = formatDeploymentDate(__BUILD_TIMESTAMP__);
+
+	function formatDeploymentDate(isoString: string) {
+		const date = new Date(isoString);
+
+		if (Number.isNaN(date.getTime())) {
+			return 'unknown';
+		}
+
+		const formatter = new Intl.DateTimeFormat('en-US', {
+			timeZone: 'America/Los_Angeles',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			hour12: false
+		});
+		const parts = formatter.formatToParts(date).reduce<Record<string, string>>((acc, part) => {
+			if (part.type !== 'literal') {
+				acc[part.type] = part.value;
+			}
+
+			return acc;
+		}, {});
+		const { year, month, day, hour, minute } = parts;
+
+		if (!year || !month || !day || !hour || !minute) {
+			return 'unknown';
+		}
+
+		return `${year}-${month}-${day} ${hour}:${minute} PT`;
+	}
+</script>
+
 <svelte:head>
 	<title>Cambermast Work Hub</title>
 	<meta name="description" content="Cambermast Work Hub · private client previews and contact info." />
@@ -28,8 +64,6 @@
 				<span aria-hidden="true">↗</span>
 			</a>
 		</div>
-		<p class="text-xs text-secondary-slate/80">
-			Deployment test: 2025-11-27 17:05 UTC — safe to remove once validated.
-		</p>
+		<p class="text-xs text-secondary-slate/80">Last deployment: {formattedLastDeployment}</p>
 	</div>
 </section>
