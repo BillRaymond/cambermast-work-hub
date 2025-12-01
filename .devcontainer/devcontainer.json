@@ -2,7 +2,7 @@
   "name": "Cambermast Work Hub",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
   "postCreateCommand": "npm install",
-  "postStartCommand": "bash .devcontainer/post-start.sh",
+  "postAttachCommand": "npm run dev",
   "forwardPorts": [5173],
   "customizations": {
     "vscode": {

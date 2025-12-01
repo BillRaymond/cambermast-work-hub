@@ -1,5 +1,7 @@
 <script lang="ts">
-	const formattedLastDeployment = formatDeploymentDate(__BUILD_TIMESTAMP__);
+    import { DEV_TITLE_PREFIX } from '$lib/title-prefix';
+
+    const formattedLastDeployment = formatDeploymentDate(__BUILD_TIMESTAMP__);
 
 	function formatDeploymentDate(isoString: string) {
 		const date = new Date(isoString);
@@ -35,7 +37,7 @@
 </script>
 
 <svelte:head>
-	<title>Cambermast Work Hub</title>
+	<title>{DEV_TITLE_PREFIX}Cambermast Work Hub</title>
 	<meta name="description" content="Cambermast Work Hub · private client previews and contact info." />
 </svelte:head>
 

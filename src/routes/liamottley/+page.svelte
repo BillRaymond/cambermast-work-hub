@@ -1,12 +1,5 @@
-<svelte:head>
-	<title>Liam Ottley · AI News Sprint Log</title>
-	<meta
-		name="description"
-		content="Live progress tracker for the Hostinger × n8n hackathon build that Liam Ottley and Cambermast are shipping."
-	/>
-</svelte:head>
-
 <script lang="ts">
+	import { DEV_TITLE_PREFIX } from '$lib/title-prefix';
 	import { browser } from '$app/environment';
 	import type { PageData } from './$types';
 	import { onDestroy } from 'svelte';
@@ -377,6 +370,14 @@
 		? new Date(lastCallbackAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 		: 'No callback yet';
 </script>
+
+<svelte:head>
+	<title>{DEV_TITLE_PREFIX}Liam Ottley · AI News Sprint Log</title>
+	<meta
+		name="description"
+		content="Live progress tracker for the Hostinger × n8n hackathon build that Liam Ottley and Cambermast are shipping."
+	/>
+</svelte:head>
 
 <article class="space-y-10">
 	<section class="section-shell border border-white/50">
