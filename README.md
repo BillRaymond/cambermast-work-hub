@@ -12,9 +12,9 @@ This is the SvelteKit site that powers the Cambermast Work Hub. It now functions
 
 ## Local development (VS Code dev container)
 
-1. Copy `.env.example` to `.env` (already done in this repo) and adjust ports or `PUBLIC_SITE_ORIGIN` if needed.
+1. Copy `.env.example` to `.env` (already done in this repo) and adjust `PUBLIC_SITE_ORIGIN` or set `VITE_DEV_PORT` if you need a non-default dev port (5105).
 2. Open the folder in VS Code, run **Dev Containers: Reopen in Container**, and wait for the Node 20 container to build. `npm install` runs automatically after the container is created.
-3. When VS Code attaches to the container it automatically opens a terminal that runs `npm run dev`. Forward port 5173 through VS Code to preview the site in your browser. Use `Ctrl+C` in that terminal to stop the dev server, then rerun `npm run dev` if you need it again later.
+3. When VS Code attaches to the container it automatically opens a terminal that runs `npm run dev`. Forward port 5105 through VS Code to preview the site in your browser. Use `Ctrl+C` in that terminal to stop the dev server, then rerun `npm run dev` if you need it again later.
 4. Use git inside the container to commit/sync changes. This repo stays separate from the homelab configuration.
 
 ## Production build
@@ -44,7 +44,7 @@ Stick to these tokens and your sub-sites will always align with cambermast.com.
 ## Running locally
 If you need to access this site from another device on your network, you can use Tailscale to expose the local development server:
 ```
-tailscale serve --tcp=5173 tcp://localhost:5173
+tailscale serve --tcp=5105 tcp://localhost:5105
 ```
 
 ---

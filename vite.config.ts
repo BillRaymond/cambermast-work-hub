@@ -4,6 +4,7 @@ import { defineConfig } from 'vite';
 
 const sharedHost = '0.0.0.0';
 const previewPort = Number(process.env.PORT ?? 4173);
+const devPort = Number(process.env.VITE_DEV_PORT ?? 5105);
 const buildTimestamp = new Date().toISOString();
 
 export default defineConfig({
@@ -13,7 +14,7 @@ export default defineConfig({
 	},
 	server: {
 		host: sharedHost,
-		port: 5173,
+		port: devPort,
 		strictPort: true,
 		allowedHosts: ['w.cambermast.com','laptop.tail8a5127.ts.net']
 	},
