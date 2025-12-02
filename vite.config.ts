@@ -16,12 +16,12 @@ export default defineConfig({
 		host: sharedHost,
 		port: devPort,
 		strictPort: true,
-		allowedHosts: ['w.cambermast.com','laptop.tail8a5127.ts.net']
+		allowedHosts: ['w.cambermast.com', 'laptop.tail8a5127.ts.net', '.tail8a5127.ts.net']
 	},
 	preview: {
 		host: sharedHost,
 		port: previewPort,
 		strictPort: true,
-		allowedHosts: ['w.cambermast.com','laptop.tail8a5127.ts.net']
+		allowedHosts: ['w.cambermast.com', 'laptop.tail8a5127.ts.net', '.tail8a5127.ts.net']
 	}
 });

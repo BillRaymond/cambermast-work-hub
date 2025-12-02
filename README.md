@@ -44,19 +44,22 @@ Stick to these tokens and your sub-sites will always align with cambermast.com.
 ## Running locally
 If you need to access this site from another device on your network, you can use Tailscale to expose the local development server:
 ```
-tailscale serve --tcp=5105 tcp://localhost:5105
+tailscale serve --https=5105 http://localhost:5105
 ```
 
 ## Remote n8n callbacks via Tailscale
-- The dev container now runs `.devcontainer/scripts/start-tailscale-serve.sh` on start. It launches `tailscaled` in userspace mode and applies `tailscale serve --tcp=5105 tcp://localhost:5105` so the remote n8n workflows can call back into your dev server automatically.
+- The dev container now runs `.devcontainer/scripts/start-tailscale-serve.sh` (requires `bash`) on start. It launches `tailscaled` in userspace mode and applies `tailscale serve --https=5105 http://localhost:5105` so the remote n8n workflows can call back into your dev server automatically, and so you can open `https://<device>.ts.net:5105` from another Tailscale device to view the UI.
 - Set a reusable auth key on the host before reopening the container so the script can authenticate without prompts:
   ```
   export TAILSCALE_AUTHKEY=tskey-example123
   export TAILSCALE_HOSTNAME=cambermast-work-hub-dev # optional label
   ```
   (VS Code forwards host env vars into the container because `devcontainer.json` maps them via `remoteEnv`.)
+- Open `https://<device>.ts.net:5105` in any Tailscale-connected browser to reach the Work Hub landing page, then navigate to `/liamottley` (or any other route) from the built-in header links. Any auto-generated hostname ending in `.tail8a5127.ts.net` (e.g. `b50640327a92.tail8a5127.ts.net`) is already allowed by Vite.
+- To keep the Liam Ottley workflow callbacks aligned with that same base origin, set `CALLBACK_BASE_URL` in your `.env`, e.g. `CALLBACK_BASE_URL=https://laptop.tail8a5127.ts.net:5105`.
+- Need to customize the tunnel? Override `TAILSCALE_SERVE_MODE` (`https`, `http`, or `tcp`) or `TAILSCALE_SERVE_TARGET` (defaults to `http://localhost:5105`) before launching the container. The helper script validates those values before applying them.
 - Logs from the helper live in `/var/log/tailscaled.log`. Run `sudo tailscale status` inside the container to confirm the session or `sudo tailscale serve status` to review the published port.
-- If you prefer to handle Tailscale manually, stop the helper (`pkill tailscaled`), run `sudo tailscale up` once, then re-run the `tailscale serve --tcp=5105 tcp://localhost:5105` command when needed.
+- If you prefer to handle Tailscale manually, stop the helper (`pkill tailscaled`), run `sudo tailscale up` once, then re-run the `tailscale serve --https=5105 http://localhost:5105` command when needed. To rerun the helper yourself, execute `bash .devcontainer/scripts/start-tailscale-serve.sh` (not `sh`).
 
 ---
 

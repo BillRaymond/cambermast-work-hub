@@ -16,29 +16,30 @@ TS_STATE_DIR="${TAILSCALE_STATE_DIR:-/var/lib/tailscale}"
 TS_STATE="${TS_STATE_DIR}/tailscaled.state"
 TS_LOG="${TAILSCALE_LOG_FILE:-/var/log/tailscaled.log}"
 SERVE_PORT="${TAILSCALE_SERVE_PORT:-5105}"
-SERVE_TARGET="${TAILSCALE_SERVE_TARGET:-tcp://localhost:5105}"
+SERVE_MODE="${TAILSCALE_SERVE_MODE:-https}"
+SERVE_TARGET="${TAILSCALE_SERVE_TARGET:-http://localhost:5105}"
 AUTH_KEY="${TAILSCALE_AUTHKEY:-}"
 HOSTNAME="${TAILSCALE_HOSTNAME:-cambermast-work-hub-dev}"
 
 ensure_daemon() {
 	if pgrep -x tailscaled >/dev/null 2>&1; then
 		return
-	}
+	fi
 
 	log 'Starting tailscaled in userspace networking mode...'
 	sudo mkdir -p "$(dirname "${TS_SOCKET}")" "${TS_STATE_DIR}" "$(dirname "${TS_LOG}")"
-	sudo nohup tailscaled \
+	sudo sh -c "nohup tailscaled \
 		--tun=userspace-networking \
-		--state="${TS_STATE}" \
-		--socket="${TS_SOCKET}" \
-		>"${TS_LOG}" 2>&1 &
+		--state=\"${TS_STATE}\" \
+		--socket=\"${TS_SOCKET}\" \
+		>\"${TS_LOG}\" 2>&1 &"
 
 	for _ in $(seq 1 20); do
 		if sudo test -S "${TS_SOCKET}"; then
 			return
 		fi
 		sleep 0.25
-	end
+	done
 
 	log "tailscaled socket (${TS_SOCKET}) not available; skipping serve configuration."
 	exit 0
@@ -53,6 +54,18 @@ wait_for_status() {
 	done
 
 	return 1
+}
+
+validate_mode() {
+	case "${SERVE_MODE}" in
+	http | https | tcp)
+		return
+		;;
+	*)
+		log "Invalid TAILSCALE_SERVE_MODE (${SERVE_MODE}). Expected http, https, or tcp."
+		exit 0
+		;;
+	esac
 }
 
 ensure_daemon
@@ -79,8 +92,10 @@ if ! wait_for_status; then
 	fi
 fi
 
-log "Configuring tailscale serve to expose ${SERVE_TARGET} on tailnet port ${SERVE_PORT}..."
-if ! sudo tailscale --socket="${TS_SOCKET}" serve --tcp="${SERVE_PORT}" "${SERVE_TARGET}"; then
+validate_mode
+
+log "Configuring tailscale serve (${SERVE_MODE}) to expose ${SERVE_TARGET} on tailnet port ${SERVE_PORT}..."
+if ! sudo tailscale --socket="${TS_SOCKET}" serve --"${SERVE_MODE}"="${SERVE_PORT}" "${SERVE_TARGET}"; then
 	log 'tailscale serve command failed; port sharing not enabled.'
 	exit 0
 fi

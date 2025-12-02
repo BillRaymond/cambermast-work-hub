@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { env as privateEnv } from '$env/dynamic/private';
 import { PUBLIC_SITE_ORIGIN } from '$env/static/public';
 import type { PageServerLoad } from './$types';
 
@@ -10,6 +11,21 @@ const parseForwarded = (value: string | null) =>
 
 const normalizeHost = (host: string) => host.split(':')[0]?.toLowerCase();
 const cleanProtocol = (value?: string | null) => (value ? value.replace(/:$/, '').toLowerCase() : undefined);
+
+const resolveManualCallbackBaseUrl = () => {
+	const manualValue = privateEnv.CALLBACK_BASE_URL;
+
+	if (!manualValue) {
+		return null;
+	}
+
+	try {
+		return new URL(manualValue).origin;
+	} catch (error) {
+		console.warn('Invalid CALLBACK_BASE_URL value, ignoring override.', error);
+		return null;
+	}
+};
 
 const getConfiguredOrigin = (forwardedHost: string | undefined, urlHost: string) => {
 	if (!PUBLIC_SITE_ORIGIN) {
@@ -31,6 +47,12 @@ const getConfiguredOrigin = (forwardedHost: string | undefined, urlHost: string)
 };
 
 const resolveCallbackBaseUrl = (url: URL, headers: Headers) => {
+	const manualBaseUrl = resolveManualCallbackBaseUrl();
+
+	if (manualBaseUrl) {
+		return manualBaseUrl;
+	}
+
 	const forwardedHost = parseForwarded(headers.get('x-forwarded-host'));
 	const forwardedProto = parseForwarded(headers.get('x-forwarded-proto'));
 	const configuredOrigin = getConfiguredOrigin(forwardedHost, url.host);
