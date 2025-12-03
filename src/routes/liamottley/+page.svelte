@@ -88,13 +88,6 @@
 		}
 	];
 
-	const baseStatusCopy = {
-		headline: 'Awaiting automation run',
-		detail: 'Trigger the POST tester below to watch each stage of the hackathon build sync in real time.',
-		highlight: 'AI news aggregator sprint log',
-		idea: 'Idea lab warming up with trend data'
-	};
-
 	const createPhaseState = (): PhaseState[] =>
 		PHASE_BLUEPRINT.map((phase, index) => ({
 			...phase,
@@ -134,10 +127,6 @@
 	let eventSource: EventSource | null = null;
 
 	let phases = createPhaseState();
-	let statusHeadline = baseStatusCopy.headline;
-	let statusDetail = baseStatusCopy.detail;
-	let highlightIdea = baseStatusCopy.highlight;
-	let statusIdea = baseStatusCopy.idea;
 	let callbackCount = 0;
 	let lastCallbackAt: string | null = null;
 	let progressOverride: number | null = null;
@@ -147,10 +136,6 @@
 		callbackCount = 0;
 		lastCallbackAt = null;
 		progressOverride = null;
-		statusHeadline = baseStatusCopy.headline;
-		statusDetail = baseStatusCopy.detail;
-		statusIdea = baseStatusCopy.idea;
-		highlightIdea = baseStatusCopy.highlight;
 	};
 
 	const prepareForRun = () => {
@@ -158,10 +143,6 @@
 		callbackCount = 0;
 		lastCallbackAt = null;
 		progressOverride = null;
-		statusHeadline = 'Listening for workflow callbacks';
-		statusDetail = 'Listening for the first callback from the n8n workflow.';
-		statusIdea = baseStatusCopy.idea;
-		highlightIdea = baseStatusCopy.highlight;
 	};
 
 	setIdleStatus();
@@ -178,26 +159,6 @@
 	const handleAutomationSignal = (payload: unknown) => {
 		const record = asRecord(payload);
 		if (!record) return;
-
-		const headline = getString(record.headline ?? record.status ?? record.title);
-		if (headline) {
-			statusHeadline = headline;
-		}
-
-		const detail = getString(record.summary ?? record.detail ?? record.description);
-		if (detail) {
-			statusDetail = detail;
-		}
-
-		const nextIdea = getString(record.idea ?? record.nextIdea ?? record.videoIdea);
-		if (nextIdea) {
-			statusIdea = nextIdea;
-		}
-
-		const highlight = getString(record.highlight ?? record.keyInsight ?? record.heroLine);
-		if (highlight) {
-			highlightIdea = highlight;
-		}
 
 		const progressValue = maybeNumber(record.progress ?? record.percentComplete ?? record.completion);
 		if (progressValue !== null) {
@@ -364,9 +325,6 @@
 	$: investigatePreviewValue = investigateInput.trim() || defaultStoryType.prompt;
 	$: computedProgress = progressOverride ?? Math.round(progressFromPhases(phases));
 	$: clampedProgress = Math.min(100, Math.max(0, computedProgress));
-	$: progressDegrees = (computedProgress / 100) * 360;
-	$: progressRingStyle = `background: conic-gradient(#3DDBA7 ${progressDegrees}deg, rgba(255, 255, 255, 0.2) 0deg)`;
-	$: currentPhase = phases.find((phase) => phase.status === 'active') ?? phases.find((phase) => phase.status !== 'done') ?? phases[phases.length - 1];
 	$: lastCallbackLabel = lastCallbackAt
 		? new Date(lastCallbackAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 		: 'No callback yet';
@@ -539,107 +497,6 @@
 				<p class="mt-4 text-secondary-slate/80">No responses yet. Run a POST to see the payload here.</p>
 			{/if}
 		{/if}
-	</section>
-
-	<section class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-		<div
-			class="section-shell border border-primary-navy/15"
-			role="region"
-			aria-live="polite"
-			aria-labelledby="live-status-heading"
-		>
-			<h2
-				id="live-status-heading"
-				class="text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/70"
-			>
-				Live status
-			</h2>
-			<p class="mt-2 text-2xl font-semibold text-primary-navy" role="status" aria-live="polite" aria-atomic="true">
-				{statusHeadline}
-			</p>
-			<p class="mt-3 text-secondary-slate/90" aria-live="polite" aria-atomic="true">{statusDetail}</p>
-
-			<div class="mt-6 rounded-2xl border border-white/60 bg-white/70 p-4">
-				<p class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Highlight</p>
-				<p class="mt-2 text-lg font-semibold text-primary-navy">{highlightIdea}</p>
-				<p class="mt-1 text-sm text-secondary-slate">{statusIdea}</p>
-			</div>
-		</div>
-
-		<div
-			class="section-shell border border-primary-navy/15"
-			role="region"
-			aria-live="polite"
-			aria-labelledby="current-phase-heading"
-		>
-			<h2
-				id="current-phase-heading"
-				class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70"
-			>
-				Current phase
-			</h2>
-			<p class="mt-2 text-xl font-semibold text-primary-navy" role="status" aria-live="polite" aria-atomic="true">
-				{currentPhase?.title}
-			</p>
-			<p class="text-sm text-secondary-slate/90" aria-live="polite" aria-atomic="true">
-				{currentPhase?.description}
-			</p>
-		</div>
-	</section>
-
-	<section
-		class="section-shell border border-primary-navy/15"
-		aria-labelledby="automation-roadmap-heading"
-	>
-			<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-				<div>
-					<h2
-						id="automation-roadmap-heading"
-						class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70"
-					>
-						Automation roadmap
-					</h2>
-				</div>
-			<p class="text-sm font-semibold text-primary-electric" aria-live="polite" aria-atomic="true">
-				{computedProgress}% of this run is already staged.
-			</p>
-		</div>
-
-		<div class="mt-6 grid gap-4 md:grid-cols-2" role="list" aria-live="polite">
-			{#each phases as phase (phase.id)}
-				<article
-					class={`rounded-2xl border p-4 transition ${
-						phase.status === 'done'
-							? 'border-accent-mint/50 bg-accent-mint/10 text-primary-navy'
-							: phase.status === 'active'
-								? 'border-primary-electric/40 bg-primary-electric/5 text-primary-navy'
-								: 'border-white/60 bg-white/70 text-secondary-slate'
-					}`}
-					animate:flip={{ duration: 400, easing: quintOut }}
-					role="listitem"
-					aria-label={`${phase.title} is ${phase.status}`}
-				>
-					<div class="flex items-center justify-between">
-						<p class="text-2xl">{phase.emoji}</p>
-						<p class={`text-xs font-semibold uppercase tracking-[0.3em] ${
-							phase.status === 'done'
-								? 'text-accent-mint'
-								: phase.status === 'active'
-									? 'text-primary-electric'
-									: 'text-secondary-slate/70'
-						}`}
-						>
-							{phase.status === 'done' ? 'Complete' : phase.status === 'active' ? 'In motion' : 'Queued'}
-						</p>
-					</div>
-					<h3 class="mt-3 text-xl font-semibold text-primary-navy">{phase.title}</h3>
-					<p class="text-sm text-secondary-slate/90">{phase.description}</p>
-					{#if phase.note}
-						<p class="mt-2 text-sm font-semibold text-primary-navy">{phase.note}</p>
-					{/if}
-				</article>
-			{/each}
-		</div>
 	</section>
 
 	<section
