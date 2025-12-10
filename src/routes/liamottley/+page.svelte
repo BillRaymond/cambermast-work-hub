@@ -565,6 +565,15 @@
 					{/each}
 				</div>
 
+				{#if errorMessage}
+					<div
+						class="mb-4 rounded-xl border border-semantic-warning/20 bg-semantic-warning/10 p-3 text-center text-sm font-semibold text-semantic-warning"
+					>
+						Cannot connect to workflow. Verify it is running and try
+						again.
+					</div>
+				{/if}
+
 				<button
 					type="submit"
 					class="inline-flex h-16 w-full items-center justify-center rounded-3xl bg-primary-electric px-8 text-sm font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-primary-electric/80 disabled:cursor-not-allowed disabled:opacity-70"
