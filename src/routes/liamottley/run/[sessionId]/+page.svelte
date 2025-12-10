@@ -2,211 +2,109 @@
     import { onDestroy, onMount } from "svelte";
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
-    import { quintOut } from "svelte/easing";
-    import { flip } from "svelte/animate";
     import type { PageData } from "./$types";
 
     export let data: PageData;
 
     const { sessionId } = $page.params;
-
-    type Step = {
-        id: string;
-        message: string;
-        detail?: string;
-        kind?: "info" | "error" | "success";
-        timestamp: string;
-    };
-
-    type PhaseStatus = "pending" | "active" | "done";
-    type PhaseDefinition = {
-        id: string;
-        title: string;
-        description: string;
-        emoji: string;
-    };
-    type PhaseState = PhaseDefinition & {
-        status: PhaseStatus;
-        note?: string;
-    };
-
     const callbackStreamUrl = `${data.callbackBaseUrl}/api/liamottley/callback/stream/${sessionId}`;
-    // Construct callbackUrl for the payload
-    const callbackUrl = `${data.callbackBaseUrl}/api/liamottley/callback/${sessionId}`;
 
-    const PHASE_BLUEPRINT: PhaseDefinition[] = [
-        {
-            id: "idea-lab",
-            title: "Idea Lab",
-            description:
-                "Score trend potential and surface validated hooks for content/video.",
-            emoji: "💡",
-        },
-        {
-            id: "handoff",
-            title: "Delivery & Callback",
-            description:
-                "Package the article + callback payload so the site can showcase it.",
-            emoji: "🚀",
-        },
-    ];
+    let growthCriteria = "";
+    let vanityHandle = "";
+    let postUrl = "";
+    let callbackUrl = "";
 
-    let steps: Step[] = [];
-    let phases: PhaseState[] = PHASE_BLUEPRINT.map((phase, index) => ({
-        ...phase,
-        status: index === 0 ? "active" : "pending",
-    }));
-    let latestResponse = "";
-    let errorMessage = "";
+    let isStarted = false;
+    let isComplete = false;
     let eventSource: EventSource | null = null;
-    let progressOverride: number | null = null;
-    let hasStarted = false;
+    let errorMessage = "";
 
-    const clamp = (value: number, min = 0, max = 100) =>
-        Math.min(max, Math.max(min, value));
-    const asRecord = (value: unknown): Record<string, unknown> | null =>
-        typeof value === "object" && value !== null && !Array.isArray(value)
-            ? (value as Record<string, unknown>)
-            : null;
-    const getString = (value: unknown) =>
-        typeof value === "string" && value.trim().length > 0
-            ? value.trim()
-            : null;
-    const maybeNumber = (value: unknown) => {
-        if (typeof value === "number" && Number.isFinite(value)) return value;
-        if (typeof value === "string") {
-            const parsed = Number.parseFloat(value);
-            return Number.isFinite(parsed) ? parsed : null;
-        }
-        return null;
-    };
-
-    const normalizePhaseStatus = (value: string | null): PhaseStatus | null => {
-        if (!value) return null;
-        const normalized = value.toLowerCase();
-        if (["complete", "completed", "done", "finished"].includes(normalized))
-            return "done";
-        if (["active", "running", "in_progress", "live"].includes(normalized))
-            return "active";
-        if (["pending", "waiting", "queued", "up_next"].includes(normalized))
-            return "pending";
-        return null;
-    };
-
-    const progressFromPhases = (currentPhases: PhaseState[]) => {
-        const slice = currentPhases.length > 0 ? 100 / currentPhases.length : 0;
-        return currentPhases.reduce((value, phase) => {
-            if (phase.status === "done") return value + slice;
-            if (phase.status === "active") return value + slice * 0.6;
-            return value;
-        }, 0);
-    };
-
-    const handleAutomationSignal = (payload: unknown) => {
-        const record = asRecord(payload);
-        if (!record) return;
-
-        const progressValue = maybeNumber(
-            record.progress ?? record.percentComplete ?? record.completion,
-        );
-        if (progressValue !== null) {
-            progressOverride = clamp(Math.round(progressValue));
+    const runWorkflow = async () => {
+        if (!postUrl) {
+            errorMessage = "Configuration error: Missing POST URL";
+            return;
         }
 
-        const phaseToken = getString(
-            (record.phase as string | undefined) ??
-                (record.stage as string | undefined) ??
-                (record.phaseId as string | undefined),
-        );
+        isStarted = true;
+        const payload = JSON.stringify({
+            growth_criteria: growthCriteria,
+            youtubeVanityUrl: vanityHandle,
+            callbackUrl,
+        });
 
-        if (phaseToken) {
-            const targetIndex = phases.findIndex(
-                (phase) =>
-                    phase.id === phaseToken ||
-                    phase.title.toLowerCase() === phaseToken.toLowerCase(),
-            );
+        console.log("Sending payload:", payload);
 
-            if (targetIndex !== -1) {
-                const incomingStatus =
-                    normalizePhaseStatus(
-                        getString(
-                            (record.phaseStatus as string | undefined) ??
-                                (record.state as string | undefined),
-                        ),
-                    ) ?? "active";
+        try {
+            const response = await fetch(postUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: payload,
+            });
 
-                const note =
-                    getString(
-                        (record.phaseNote as string | undefined) ??
-                            (record.note as string | undefined) ??
-                            (record.summary as string | undefined),
-                    ) ?? undefined;
-
-                phases = phases.map((phase, index) => {
-                    if (index < targetIndex) {
-                        return { ...phase, status: "done" };
+            if (!response.ok) {
+                const text = await response.text();
+                errorMessage = `Request failed: ${response.status} ${text}`;
+                isStarted = false; // Reset so they can try again
+            } else {
+                // Check if the response itself indicates success
+                try {
+                    const data = await response.json();
+                    if (data && data.success === true) {
+                        isComplete = true;
                     }
-
-                    if (index === targetIndex) {
-                        return { ...phase, status: incomingStatus, note };
-                    }
-
-                    return { ...phase, status: "pending" };
-                });
+                } catch (e) {
+                    // Response might be empty or not JSON, which is fine, we wait for callback
+                }
             }
+        } catch (e) {
+            errorMessage = e instanceof Error ? e.message : "Network error";
+            isStarted = false;
         }
-    };
-
-    const pushStep = (
-        message: string,
-        detail?: string,
-        kind: Step["kind"] = "info",
-    ) => {
-        const id = crypto.randomUUID
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random()}`;
-        const entry: Step = {
-            id,
-            message,
-            detail,
-            kind,
-            timestamp: new Date().toISOString(),
-        };
-        steps = [entry, ...steps];
     };
 
     onMount(() => {
         if (browser) {
-            // Restore state from navigation if available
-            if (history.state) {
-                if (history.state.phases) phases = history.state.phases;
-                if (history.state.steps) steps = history.state.steps;
-                if (history.state.latestResponse)
-                    latestResponse = history.state.latestResponse;
-            }
+            // Restore state from navigation OR sessionStorage
+            // Read params from URL
+            const params = $page.url.searchParams;
+            growthCriteria = params.get("growth_criteria") || "";
+            vanityHandle = params.get("vanity_handle") || "";
+            postUrl = params.get("post_url") || "";
+            callbackUrl = params.get("callback_url") || "";
 
-            // Start Stream to listen for further updates
             eventSource = new EventSource(callbackStreamUrl);
             eventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    const detail =
-                        typeof data.payload === "string"
-                            ? data.payload
-                            : data.payload
-                              ? JSON.stringify(data.payload, null, 2)
-                              : undefined;
 
-                    if (data.type === "connected") {
-                        // Connected
-                    } else {
-                        pushStep(data.message ?? "Update received", detail);
-                        if (data.type === "callback") {
-                            handleAutomationSignal(data.payload);
+                    // Check for completion signals
+                    if (data.type === "callback") {
+                        const payload =
+                            typeof data.payload === "object"
+                                ? data.payload
+                                : {};
+                        const status = (
+                            payload.phaseStatus ||
+                            payload.state ||
+                            ""
+                        ).toLowerCase();
+                        const percent =
+                            payload.progress ??
+                            payload.percentComplete ??
+                            payload.completion;
+
+                        if (
+                            status === "done" ||
+                            status === "complete" ||
+                            percent === 100 ||
+                            payload.complete === true ||
+                            payload.success === true
+                        ) {
+                            isComplete = true;
                         }
                     }
                 } catch (e) {
-                    console.error("Error parsing event", e);
+                    // ignore
                 }
             };
 
@@ -219,195 +117,125 @@
     onDestroy(() => {
         if (browser) eventSource?.close();
     });
-
-    $: computedProgress =
-        progressOverride ?? Math.round(progressFromPhases(phases));
-    $: clampedProgress = Math.min(100, Math.max(0, computedProgress));
 </script>
 
-<article class="space-y-10">
-    <section
-        class="section-shell border border-white/50"
-        aria-label="Automation Progress"
-    >
-        <div class="space-y-8">
-            <!-- Phase Tracker -->
-            <div class="grid gap-6 md:grid-cols-2">
-                {#each phases as phase (phase.id)}
-                    {@const isDone = phase.status === "done"}
-                    {@const isActive = phase.status === "active"}
-
-                    <div
-                        class={`relative overflow-hidden rounded-3xl border p-6 transition-all duration-500 ${
-                            isActive
-                                ? "border-primary-electric bg-primary-electric/5 shadow-2xl ring-1 ring-primary-electric/50"
-                                : isDone
-                                  ? "border-accent-mint/50 bg-accent-mint/5 opacity-80"
-                                  : "border-white/20 bg-white/40 opacity-50"
-                        }`}
-                    >
-                        <div class="flex items-start gap-4">
-                            <div
-                                class={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-sm transition-transform duration-500 ${
-                                    isActive
-                                        ? "scale-110 bg-white"
-                                        : "bg-white/60"
-                                }`}
-                            >
-                                {phase.emoji}
-                            </div>
-                            <div class="space-y-1">
-                                <h3
-                                    class={`font-bold uppercase tracking-wider ${isActive ? "text-primary-navy" : "text-secondary-slate"}`}
-                                >
-                                    {phase.title}
-                                </h3>
-                                <p class="text-sm text-secondary-slate/90">
-                                    {phase.description}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="mt-6 flex items-center gap-3">
-                            {#if isDone}
-                                <span
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-accent-mint/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-navy"
-                                >
-                                    <span
-                                        class="h-2 w-2 rounded-full bg-accent-mint"
-                                    ></span>
-                                    Complete
-                                </span>
-                            {:else if isActive}
-                                <span
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-primary-electric/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-electric"
-                                >
-                                    <span class="relative flex h-2 w-2">
-                                        <span
-                                            class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-electric opacity-75"
-                                        ></span>
-                                        <span
-                                            class="relative inline-flex h-2 w-2 rounded-full bg-primary-electric"
-                                        ></span>
-                                    </span>
-                                    Processing...
-                                </span>
-                            {:else}
-                                <span
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-secondary-slate/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-secondary-slate/60"
-                                >
-                                    Pending
-                                </span>
-                            {/if}
-
-                            {#if phase.note}
-                                <p
-                                    class="text-xs text-secondary-slate/80 line-clamp-1"
-                                >
-                                    {phase.note}
-                                </p>
-                            {/if}
-                        </div>
-
-                        {#if isActive}
-                            <div
-                                class="absolute bottom-0 left-0 h-1 w-full bg-primary-electric/10"
-                            >
-                                <div
-                                    class="h-full animate-progress-indeterminate bg-primary-electric"
-                                ></div>
-                            </div>
-                        {/if}
-                    </div>
-                {/each}
-            </div>
-
-            <!-- Live Log Stream as Cards -->
-            <div class="space-y-4">
-                {#each steps as step (step.id)}
-                    <div
-                        class="rounded-2xl border border-white/60 bg-white/60 p-4 shadow-sm"
-                        animate:flip={{ duration: 350, easing: quintOut }}
-                    >
-                        <div class="flex items-center gap-3">
-                            <div
-                                class={`h-2 w-2 rounded-full ${step.kind === "error" ? "bg-semantic-warning" : "bg-primary-electric"}`}
-                            ></div>
-                            <p class="text-sm font-medium text-secondary-slate">
-                                {step.message}
-                            </p>
-                        </div>
-                        {#if step.detail}
-                            <pre
-                                class="mt-2 text-xs text-secondary-slate/70 whitespace-pre-wrap">{step.detail}</pre>
-                        {/if}
-                    </div>
-                {/each}
-            </div>
-
-            <!-- Final Result -->
-            {#if errorMessage}
+<article
+    class="w-full bg-white/95 border-b border-primary-electric/20 backdrop-blur-md shadow-sm"
+>
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <!-- Left: Context -->
+        <div class="flex items-center gap-8">
+            <div class="flex items-center gap-3">
                 <div
-                    class="overflow-hidden rounded-3xl border border-semantic-warning/40 bg-white shadow-xl"
+                    class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-electric/10 text-xl"
                 >
-                    <div
-                        class="border-b border-semantic-warning/10 bg-semantic-warning/5 px-6 py-4"
+                    ⚡
+                </div>
+                <div>
+                    <p
+                        class="text-[0.65rem] font-bold uppercase tracking-widest text-secondary-slate/60"
                     >
-                        <h3
-                            class="flex items-center gap-2 text-lg font-bold text-semantic-warning"
-                        >
-                            <span>⚠️</span>
-                            <span>Connection Error</span>
-                        </h3>
-                    </div>
-                    <div class="p-6">
-                        <p class="font-semibold text-primary-navy mb-2">
-                            {errorMessage}
-                        </p>
+                        Target Channel
+                    </p>
+                    <p
+                        class="text-sm font-bold text-primary-navy tracking-wide"
+                    >
+                        {vanityHandle || "..."}
+                    </p>
+                </div>
+            </div>
 
-                        <div class="mt-6 flex justify-end">
-                            <a
-                                href="/liamottley"
-                                class="rounded-xl border border-secondary-slate/20 px-4 py-2 text-sm font-semibold text-primary-navy hover:bg-secondary-slate/5"
-                            >
-                                Try Again
-                            </a>
-                        </div>
+            <div class="hidden h-8 w-px bg-secondary-slate/10 sm:block"></div>
+
+            <div class="hidden sm:block">
+                <p
+                    class="text-[0.65rem] font-bold uppercase tracking-widest text-secondary-slate/60"
+                >
+                    Prompt
+                </p>
+                <p
+                    class="text-xs font-semibold text-secondary-slate max-w-md truncate"
+                >
+                    {growthCriteria || "..."}
+                </p>
+            </div>
+        </div>
+
+        <!-- Right: Status -->
+        <div class="flex items-center gap-4">
+            {#if isComplete}
+                <div
+                    class="flex items-center gap-2 rounded-full bg-accent-mint/10 px-4 py-2 pr-5"
+                >
+                    <span
+                        class="flex h-6 w-6 items-center justify-center rounded-full bg-accent-mint text-white"
+                    >
+                        <svg
+                            class="h-3.5 w-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            stroke-width="3"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M5 13l4 4L19 7"
+                            />
+                        </svg>
+                    </span>
+                    <span
+                        class="text-xs font-bold uppercase tracking-wider text-primary-navy"
+                        >Content generated!</span
+                    >
+                </div>
+            {:else if isStarted}
+                <div class="flex items-center gap-3">
+                    <p
+                        class="text-xs font-bold uppercase tracking-wider text-primary-electric animate-pulse"
+                    >
+                        Processing
+                    </p>
+                    <div
+                        class="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary-electric/10"
+                    >
+                        <svg
+                            class="h-4 w-4 text-primary-electric animate-spin"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                        >
+                            <circle
+                                class="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                stroke-width="4"
+                            ></circle>
+                            <path
+                                class="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                        </svg>
                     </div>
                 </div>
-            {:else if latestResponse}
-                <div
-                    class="overflow-hidden rounded-3xl border border-primary-electric/20 bg-white shadow-xl"
-                >
-                    <div
-                        class="border-b border-secondary-slate/10 bg-gradient-to-r from-primary-electric/5 to-transparent px-6 py-4"
+            {:else}
+                <div class="flex items-center gap-4">
+                    {#if errorMessage}
+                        <p class="text-xs font-bold text-semantic-warning">
+                            {errorMessage}
+                        </p>
+                    {/if}
+                    <button
+                        on:click={runWorkflow}
+                        class="rounded-xl bg-primary-electric px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg transition-transform hover:scale-105 hover:bg-primary-electric/90 active:scale-95"
                     >
-                        <h3
-                            class="flex items-center gap-2 text-lg font-bold text-primary-navy"
-                        >
-                            <span>📝</span>
-                            <span>Investigation Result</span>
-                        </h3>
-                    </div>
-                    <div class="p-6">
-                        <div
-                            class="prose prose-sm max-w-none text-secondary-slate"
-                        >
-                            <pre
-                                class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-secondary-slate">{latestResponse}</pre>
-                        </div>
-
-                        <div class="mt-6 flex justify-end">
-                            <a
-                                href="/liamottley"
-                                class="rounded-xl border border-secondary-slate/20 px-4 py-2 text-sm font-semibold text-primary-navy hover:bg-secondary-slate/5"
-                            >
-                                Start New Search
-                            </a>
-                        </div>
-                    </div>
+                        Generate Content
+                    </button>
                 </div>
             {/if}
         </div>
-    </section>
+    </div>
 </article>

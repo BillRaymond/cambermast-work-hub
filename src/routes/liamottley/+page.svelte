@@ -30,7 +30,7 @@
 	const TEST_POST_URL =
 		"https://n8n.cambermast.com/webhook-test/0ee002a9-3228-4daa-9c05-4db349fc13cc";
 	const PROD_POST_URL =
-		"https://n8n.cambermast.com/webhook/0ee002a9-3228-4daa-9c05-4db349fc13cc";
+		"https://n8n.cambermast.com/webhook/2999c2ae-9b07-40be-ae0e-8ae5bb56090b";
 	const STORY_TYPES = [
 		{
 			id: "latest",
@@ -345,62 +345,18 @@
 		isLoading = true;
 		latestResponse = "";
 		errorMessage = "";
-		steps = [];
+		// Simplified navigation only - logic moved to Run page
 
-		prepareForRun();
+		const params = new URLSearchParams();
+		params.set("growth_criteria", growthCriteriaInput);
+		params.set("vanity_handle", youtubeVanityHandle);
+		params.set("post_url", currentPostUrl);
+		params.set("callback_url", callbackUrl);
 
-		const payload = JSON.stringify({
-			growth_criteria: growthCriteria,
-			youtubeVanityUrl: vanityHandle,
-			callbackUrl,
-		});
+		const resultsUrl = `/liamottley/run/${data.sessionId}?${params.toString()}`;
 
-		pushStep("Sending POST request", `Endpoint: ${postUrl}\n${payload}`);
-
-		try {
-			const response = await fetch(postUrl, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: payload,
-			});
-			const text = await response.text();
-
-			if (!response.ok) {
-				errorMessage = `Request failed with status ${response.status}`;
-				pushStep(
-					"POST response received with errors",
-					`Status: ${response.status}\n${text}`,
-					"error",
-				);
-				pushStep(
-					"POST response received",
-					`Status: ${response.status}`,
-					"success",
-				);
-				// Navigate to results page with current state
-				await goto(`/liamottley/run/${data.sessionId}`, {
-					state: { phases, steps, latestResponse: text },
-				});
-				return;
-			}
-
-			latestResponse = text || "(empty response body)";
-		} catch (error) {
-			errorMessage =
-				error instanceof Error
-					? error.message
-					: "Unknown error occurred";
-			pushStep("POST request failed", errorMessage, "error");
-		} finally {
-			isLoading = false;
-			pushStep(
-				"POST run complete",
-				undefined,
-				errorMessage ? "error" : "success",
-			);
-		}
+		await goto(resultsUrl);
+		isLoading = false; // Reset loading state after navigation
 	};
 
 	const setStoryType = (storyId: StoryType["id"]) => {
@@ -582,13 +538,8 @@
 				<button
 					type="submit"
 					class="inline-flex h-16 w-full items-center justify-center rounded-3xl bg-primary-electric px-8 text-sm font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-primary-electric/80 disabled:cursor-not-allowed disabled:opacity-70"
-					disabled={isLoading}
 				>
-					{#if isLoading}
-						Starting workflow...
-					{:else}
-						Submit idea
-					{/if}
+					Ready
 				</button>
 
 				<div
