@@ -3,6 +3,7 @@
 	import { browser } from "$app/environment";
 	import type { PageData } from "./$types";
 	import { onDestroy, onMount } from "svelte";
+	import { goto } from "$app/navigation";
 
 	type Step = {
 		id: string;
@@ -373,12 +374,16 @@
 					`Status: ${response.status}\n${text}`,
 					"error",
 				);
-			} else {
 				pushStep(
 					"POST response received",
 					`Status: ${response.status}`,
 					"success",
 				);
+				// Navigate to results page with current state
+				await goto(`/liamottley/run/${data.sessionId}`, {
+					state: { phases, steps, latestResponse: text },
+				});
+				return;
 			}
 
 			latestResponse = text || "(empty response body)";
@@ -580,7 +585,7 @@
 					disabled={isLoading}
 				>
 					{#if isLoading}
-						Scanning...
+						Starting workflow...
 					{:else}
 						Submit idea
 					{/if}
@@ -746,220 +751,5 @@
 			</form>
 		</div>
 	</section>
-
-	<section
-		class="section-shell border border-white/50"
-		aria-label="Automation Progress"
-	>
-		{#if steps.length > 0 || isLoading || phases.some((p) => p.status !== "pending")}
-			<div class="space-y-8">
-				<!-- Phase Tracker -->
-				<div class="grid gap-6 md:grid-cols-2">
-					{#each phases as phase (phase.id)}
-						{@const isDone = phase.status === "done"}
-						{@const isActive = phase.status === "active"}
-						{@const isPending = phase.status === "pending"}
-
-						<div
-							class={`relative overflow-hidden rounded-3xl border p-6 transition-all duration-500 ${
-								isActive
-									? "border-primary-electric bg-primary-electric/5 shadow-2xl ring-1 ring-primary-electric/50"
-									: isDone
-										? "border-accent-mint/50 bg-accent-mint/5 opacity-80"
-										: "border-white/20 bg-white/40 opacity-50"
-							}`}
-						>
-							<div class="flex items-start gap-4">
-								<div
-									class={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-sm transition-transform duration-500 ${
-										isActive
-											? "scale-110 bg-white"
-											: "bg-white/60"
-									}`}
-								>
-									{phase.emoji}
-								</div>
-								<div class="space-y-1">
-									<h3
-										class={`font-bold uppercase tracking-wider ${isActive ? "text-primary-navy" : "text-secondary-slate"}`}
-									>
-										{phase.title}
-									</h3>
-									<p class="text-sm text-secondary-slate/90">
-										{phase.description}
-									</p>
-								</div>
-							</div>
-
-							<!-- Status Indicator -->
-							<div class="mt-6 flex items-center gap-3">
-								{#if isDone}
-									<span
-										class="inline-flex items-center gap-1.5 rounded-full bg-accent-mint/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-navy"
-									>
-										<span
-											class="h-2 w-2 rounded-full bg-accent-mint"
-										></span>
-										Complete
-									</span>
-								{:else if isActive}
-									<span
-										class="inline-flex items-center gap-1.5 rounded-full bg-primary-electric/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-electric"
-									>
-										<span class="relative flex h-2 w-2">
-											<span
-												class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-electric opacity-75"
-											></span>
-											<span
-												class="relative inline-flex h-2 w-2 rounded-full bg-primary-electric"
-											></span>
-										</span>
-										Processing...
-									</span>
-								{:else}
-									<span
-										class="inline-flex items-center gap-1.5 rounded-full bg-secondary-slate/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-secondary-slate/60"
-									>
-										Pending
-									</span>
-								{/if}
-
-								{#if phase.note}
-									<p
-										class="text-xs text-secondary-slate/80 line-clamp-1"
-									>
-										{phase.note}
-									</p>
-								{/if}
-							</div>
-
-							<!-- Progress Bar (Active Only) -->
-							{#if isActive}
-								<div
-									class="absolute bottom-0 left-0 h-1 w-full bg-primary-electric/10"
-								>
-									<div
-										class="h-full animate-progress-indeterminate bg-primary-electric"
-									></div>
-								</div>
-							{/if}
-						</div>
-					{/each}
-				</div>
-
-				<!-- Live Log Stream (Simplified) -->
-				{#if steps.length > 0 && !latestResponse}
-					<div
-						class="rounded-2xl border border-white/60 bg-white/60 p-4 shadow-inner"
-					>
-						<div class="flex items-center gap-3">
-							<div
-								class="h-2 w-2 animate-pulse rounded-full bg-primary-electric"
-							></div>
-							<p class="text-sm font-medium text-secondary-slate">
-								{steps[0].message}
-							</p>
-						</div>
-					</div>
-				{/if}
-
-				<!-- Final Result -->
-				{#if errorMessage}
-					<div
-						class="overflow-hidden rounded-3xl border border-semantic-warning/40 bg-white shadow-xl"
-					>
-						<div
-							class="border-b border-semantic-warning/10 bg-semantic-warning/5 px-6 py-4"
-						>
-							<h3
-								class="flex items-center gap-2 text-lg font-bold text-semantic-warning"
-							>
-								<span>⚠️</span>
-								<span>Connection Error</span>
-							</h3>
-						</div>
-						<div class="p-6">
-							<p class="font-semibold text-primary-navy mb-2">
-								{errorMessage}
-							</p>
-							<div
-								class="prose prose-sm max-w-none text-secondary-slate"
-							>
-								<pre
-									class="whitespace-pre-wrap font-sans text-xs leading-relaxed text-secondary-slate bg-secondary-slate/5 p-4 rounded-xl">{latestResponse}</pre>
-							</div>
-
-							<div class="mt-6 flex justify-end">
-								<button
-									class="rounded-xl border border-secondary-slate/20 px-4 py-2 text-sm font-semibold text-primary-navy hover:bg-secondary-slate/5"
-									on:click={() => {
-										latestResponse = "";
-										errorMessage = "";
-										steps = [];
-										setIdleStatus();
-									}}
-								>
-									Try Again
-								</button>
-							</div>
-						</div>
-					</div>
-				{:else if latestResponse}
-					<div
-						class="overflow-hidden rounded-3xl border border-primary-electric/20 bg-white shadow-xl"
-					>
-						<div
-							class="border-b border-secondary-slate/10 bg-gradient-to-r from-primary-electric/5 to-transparent px-6 py-4"
-						>
-							<h3
-								class="flex items-center gap-2 text-lg font-bold text-primary-navy"
-							>
-								<span>📝</span>
-								<span>Investigation Result</span>
-							</h3>
-						</div>
-						<div class="p-6">
-							<div
-								class="prose prose-sm max-w-none text-secondary-slate"
-							>
-								<pre
-									class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-secondary-slate">{latestResponse}</pre>
-							</div>
-
-							<div class="mt-6 flex justify-end">
-								<button
-									class="rounded-xl border border-secondary-slate/20 px-4 py-2 text-sm font-semibold text-primary-navy hover:bg-secondary-slate/5"
-									on:click={() => {
-										latestResponse = "";
-										steps = [];
-										setIdleStatus();
-									}}
-								>
-									Start New Search
-								</button>
-							</div>
-						</div>
-					</div>
-				{/if}
-			</div>
-		{:else}
-			<!-- Empty State -->
-			<div
-				class="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed border-white/40 bg-white/20 p-8 text-center"
-			>
-				<div class="rounded-full bg-white/40 p-4 text-3xl opacity-50">
-					✨
-				</div>
-				<div class="max-w-md space-y-1">
-					<p class="font-medium text-primary-navy">
-						Ready for your input
-					</p>
-					<p class="text-sm text-secondary-slate/80">
-						Results will appear here once you start an
-						investigation.
-					</p>
-				</div>
-			</div>
-		{/if}
-	</section>
 </article>
+```
