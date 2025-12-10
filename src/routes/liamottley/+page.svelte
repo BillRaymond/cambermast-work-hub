@@ -844,7 +844,47 @@
 				{/if}
 
 				<!-- Final Result -->
-				{#if latestResponse}
+				{#if errorMessage}
+					<div
+						class="overflow-hidden rounded-3xl border border-semantic-warning/40 bg-white shadow-xl"
+					>
+						<div
+							class="border-b border-semantic-warning/10 bg-semantic-warning/5 px-6 py-4"
+						>
+							<h3
+								class="flex items-center gap-2 text-lg font-bold text-semantic-warning"
+							>
+								<span>⚠️</span>
+								<span>Connection Error</span>
+							</h3>
+						</div>
+						<div class="p-6">
+							<p class="font-semibold text-primary-navy mb-2">
+								{errorMessage}
+							</p>
+							<div
+								class="prose prose-sm max-w-none text-secondary-slate"
+							>
+								<pre
+									class="whitespace-pre-wrap font-sans text-xs leading-relaxed text-secondary-slate bg-secondary-slate/5 p-4 rounded-xl">{latestResponse}</pre>
+							</div>
+
+							<div class="mt-6 flex justify-end">
+								<button
+									class="rounded-xl border border-secondary-slate/20 px-4 py-2 text-sm font-semibold text-primary-navy hover:bg-secondary-slate/5"
+									on:click={() => {
+										latestResponse = "";
+										errorMessage = "";
+										steps = [];
+										setIdleStatus();
+									}}
+								>
+									Try Again
+								</button>
+							</div>
+						</div>
+					</div>
+				{:else if latestResponse}
 					<div
 						class="overflow-hidden rounded-3xl border border-primary-electric/20 bg-white shadow-xl"
 					>
