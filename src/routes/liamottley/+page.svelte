@@ -2,7 +2,7 @@
 	import { DEV_TITLE_PREFIX } from "$lib/title-prefix";
 	import { browser } from "$app/environment";
 	import type { PageData } from "./$types";
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
 
 	type Step = {
 		id: string;
@@ -142,7 +142,7 @@
 	let errorMessage = "";
 	let steps: Step[] = [];
 	let eventSource: EventSource | null = null;
-	let youtubeVanityHandle = "";
+	let youtubeVanityHandle = "@liamottley";
 	let endpointMode: "test" | "prod" = "test";
 	let testUrl = TEST_POST_URL;
 	let prodUrl = PROD_POST_URL;
@@ -313,6 +313,13 @@
 		onDestroy(() => eventSource?.close());
 	}
 
+	onMount(() => {
+		const savedHandle = sessionStorage.getItem("youtubeVanityHandle");
+		if (savedHandle) {
+			youtubeVanityHandle = savedHandle;
+		}
+	});
+
 	const runPost = async () => {
 		const growthCriteria =
 			growthCriteriaInput.trim() || defaultStoryType.prompt;
@@ -323,6 +330,10 @@
 			errorMessage =
 				"YouTube vanity URL must start with @ and cannot contain spaces.";
 			return;
+		}
+
+		if (browser) {
+			sessionStorage.setItem("youtubeVanityHandle", vanityHandle);
 		}
 
 		if (!postUrl) {
