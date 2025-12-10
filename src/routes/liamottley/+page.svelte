@@ -520,16 +520,16 @@
 				</div>
 
 				<div
-					class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+					class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
 					role="group"
 					aria-label="Suggested investigation presets"
 				>
 					{#each STORY_TYPES as story (story.id)}
 						{@const isActive = selectedStoryTypeId === story.id}
 						<label
-							class={`group relative block cursor-pointer overflow-hidden rounded-[1.5rem] border-2 p-5 pb-6 pt-8 text-left shadow-sm transition-all ${
+							class={`group relative block cursor-pointer overflow-hidden rounded-2xl border-2 px-4 py-3 text-left shadow-sm transition-all ${
 								isActive
-									? "border-primary-electric bg-primary-electric/10 text-primary-navy shadow-xl ring-2 ring-primary-electric/40"
+									? "border-primary-electric bg-primary-electric/10 text-primary-navy shadow-lg ring-2 ring-primary-electric/40"
 									: "border-primary-electric/30 bg-white/80 text-secondary-slate outline outline-1 outline-primary-electric/10 hover:-translate-y-0.5 hover:border-primary-electric/50 hover:bg-white hover:outline-primary-electric/30"
 							}`}
 						>
@@ -542,10 +542,12 @@
 								on:change={() => setStoryType(story.id)}
 							/>
 							<span
-								class="text-xs font-semibold uppercase tracking-[0.3em]"
+								class="text-[0.65rem] font-bold uppercase tracking-[0.2em] opacity-90"
 								>{story.title}</span
 							>
-							<p class="mt-3 text-sm text-secondary-slate/80">
+							<p
+								class="mt-0.5 text-xs font-medium text-secondary-slate/90 leading-snug"
+							>
 								{story.description}
 							</p>
 						</label>
