@@ -28,7 +28,8 @@
 
 	export let data: PageData;
 
-	const defaultUrl = 'https://n8n.cambermast.com/webhook-test/2999c2ae-9b07-40be-ae0e-8ae5bb56090b';
+	const TEST_POST_URL = 'https://n8n.cambermast.com/webhook-test/0ee002a9-3228-4daa-9c05-4db349fc13cc';
+	const PROD_POST_URL = 'https://n8n.cambermast.com/webhook/0ee002a9-3228-4daa-9c05-4db349fc13cc';
 	const STORY_TYPES = [
 		{
 			id: 'latest',
@@ -69,6 +70,7 @@
 	] as const;
 	type StoryType = (typeof STORY_TYPES)[number];
 	const defaultStoryType = STORY_TYPES[0];
+	const YOUTUBE_VANITY_PATTERN = /^@[A-Za-z0-9._-]+$/;
 
 	const derivedCallbackUrl = `${data.callbackBaseUrl}/api/liamottley/callback/${data.sessionId}`;
 	const callbackStreamUrl = `${data.callbackBaseUrl}/api/liamottley/callback/stream/${data.sessionId}`;
@@ -116,15 +118,18 @@
 		return null;
 	};
 
-	let targetUrl = defaultUrl;
 	let callbackUrl = derivedCallbackUrl;
 	let selectedStoryTypeId: StoryType['id'] | null = defaultStoryType.id;
-	let investigateInput: string = defaultStoryType.prompt;
+	let growthCriteriaInput: string = defaultStoryType.prompt;
 	let isLoading = false;
 	let latestResponse = '';
 	let errorMessage = '';
 	let steps: Step[] = [];
 	let eventSource: EventSource | null = null;
+	let youtubeVanityHandle = '';
+	let endpointMode: 'test' | 'prod' = 'test';
+	let testUrl = TEST_POST_URL;
+	let prodUrl = PROD_POST_URL;
 
 	let phases = createPhaseState();
 	let callbackCount = 0;
@@ -265,7 +270,19 @@
 	}
 
 	const runPost = async () => {
-		const ideaToInvestigate = investigateInput.trim() || defaultStoryType.prompt;
+		const growthCriteria = growthCriteriaInput.trim() || defaultStoryType.prompt;
+		const vanityHandle = youtubeVanityHandle.trim();
+		const postUrl = currentPostUrl.trim();
+
+		if (!YOUTUBE_VANITY_PATTERN.test(vanityHandle)) {
+			errorMessage = 'YouTube vanity URL must start with @ and cannot contain spaces.';
+			return;
+		}
+
+		if (!postUrl) {
+			errorMessage = 'Provide a URL for the selected POST endpoint before running the automation.';
+			return;
+		}
 		isLoading = true;
 		latestResponse = '';
 		errorMessage = '';
@@ -274,14 +291,15 @@
 		prepareForRun();
 
 		const payload = JSON.stringify({
-			investigate: ideaToInvestigate,
+			growth_criteria: growthCriteria,
+			youtubeVanityUrl: vanityHandle,
 			callbackUrl
 		});
 
-		pushStep('Sending POST request', `Endpoint: ${targetUrl}\n${payload}`);
+		pushStep('Sending POST request', `Endpoint: ${postUrl}\n${payload}`);
 
 		try {
-			const response = await fetch(targetUrl, {
+			const response = await fetch(postUrl, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -311,18 +329,27 @@
 		selectedStoryTypeId = storyId;
 		const matched = STORY_TYPES.find((story) => story.id === storyId);
 		if (matched) {
-			investigateInput = matched.prompt;
+			growthCriteriaInput = matched.prompt;
 		}
 	};
 	$: {
-		const matched = STORY_TYPES.find((story) => story.prompt === investigateInput);
+		const matched = STORY_TYPES.find((story) => story.prompt === growthCriteriaInput);
 		const nextId = matched ? matched.id : null;
 		if (nextId !== selectedStoryTypeId) {
 			selectedStoryTypeId = nextId;
 		}
 	}
 
-	$: investigatePreviewValue = investigateInput.trim() || defaultStoryType.prompt;
+	$: growthCriteriaPreviewValue = growthCriteriaInput.trim() || defaultStoryType.prompt;
+	$: vanityPreviewValue = youtubeVanityHandle.trim();
+	$: currentPostUrl = endpointMode === 'prod' ? prodUrl : testUrl;
+	$: payloadPreview = {
+		growth_criteria: growthCriteriaPreviewValue,
+		youtubeVanityUrl: vanityPreviewValue,
+		callbackUrl,
+		endpointMode,
+		postUrl: currentPostUrl
+	};
 	$: computedProgress = progressOverride ?? Math.round(progressFromPhases(phases));
 	$: clampedProgress = Math.min(100, Math.max(0, computedProgress));
 	$: lastCallbackLabel = lastCallbackAt
@@ -354,23 +381,43 @@
 				<p id="post-run-tip" class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">
 					Fill every input before triggering the workflow POST.
 				</p>
-				<label class="block text-sm font-medium text-secondary-slate/90" for="investigate-prompt">
-					Story signal to investigate
+				<label class="block text-sm font-medium text-secondary-slate/90" for="youtube-vanity">
+					YouTube vanity URL
+				</label>
+				<input
+					id="youtube-vanity"
+					name="youtube-vanity"
+					class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
+					bind:value={youtubeVanityHandle}
+					placeholder="@liamottley"
+					type="text"
+					required
+					pattern="^@[A-Za-z0-9._-]+$"
+					title="Start with @ and use letters, numbers, periods, underscores, or hyphens only"
+					inputmode="text"
+					aria-describedby="youtube-vanity-tip"
+				/>
+				<p id="youtube-vanity-tip" class="text-xs text-secondary-slate/80">
+					Paste the vanity handle from your channel (e.g., <code>@liamottley</code>). The automation requires the leading @ and no spaces.
+				</p>
+
+				<label class="block text-sm font-medium text-secondary-slate/90" for="growth-criteria-input">
+					Growth criteria prompt
 				</label>
 				<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
 					<div class="flex-1 space-y-2">
 						<input
-							id="investigate-prompt"
-							name="investigate-prompt"
+							id="growth-criteria-input"
+							name="growth-criteria-input"
 							class="h-16 w-full rounded-3xl border-2 border-primary-electric/60 bg-white px-6 text-lg font-semibold text-primary-navy shadow-card focus:border-primary-electric focus:outline-none"
-							bind:value={investigateInput}
+							bind:value={growthCriteriaInput}
 							placeholder={defaultStoryType.prompt}
 							type="text"
 							required
-							aria-describedby="investigate-help"
+							aria-describedby="growth-criteria-help"
 						/>
-						<p id="investigate-help" class="text-xs text-secondary-slate/80">
-							We send this text to the automation as the <code>investigate</code> payload. Edit it or pick a preset below.
+						<p id="growth-criteria-help" class="text-xs text-secondary-slate/80">
+							We send this text to the automation as the <code>growth_criteria</code> payload. Edit it or pick a preset below.
 						</p>
 					</div>
 					<button
@@ -386,62 +433,119 @@
 					</button>
 				</div>
 
+				<div class="space-y-3 rounded-3xl border border-white/70 bg-white/85 p-4 shadow-card">
+					<div class="space-y-3">
+						<div class="space-y-2">
+							<p class="text-sm font-semibold text-primary-navy">Hostinger n8n URL endpoints</p>
+							<p class="text-xs text-secondary-slate/80">
+								Leave the box unchecked to use the safe TEST webhook. Toggle it on only when you're ready to hit PROD.
+							</p>
+						</div>
+						<label class="inline-flex items-center gap-3 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 text-sm font-semibold text-primary-navy shadow-inner">
+							<input
+								type="checkbox"
+								class="h-5 w-5 rounded border-primary-electric text-primary-electric focus:ring-primary-electric"
+								checked={endpointMode === 'prod'}
+								on:change={(event) => (endpointMode = event.currentTarget.checked ? 'prod' : 'test')}
+							/>
+							<span>Use production endpoint (PROD)</span>
+						</label>
+						<p class="text-xs text-secondary-slate/80">
+							Currently posting to <span class="font-semibold text-primary-navy">{endpointMode === 'prod' ? 'Production' : 'Test'}</span> —
+							<code class="whitespace-pre-wrap break-all text-[0.68rem]">{currentPostUrl}</code>
+						</p>
+					</div>
+
+					<details class="rounded-2xl border border-white/60 bg-white/90 p-4" aria-label="Custom endpoint URLs">
+						<summary class="flex cursor-pointer items-center justify-between text-sm font-semibold text-primary-navy">
+							<span>View & edit endpoint URLs</span>
+							<span class="text-xs text-secondary-slate/80">Tap to reveal or hide</span>
+						</summary>
+						<div class="mt-4 space-y-4">
+							<div>
+								<label class="block text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/80" for="test-endpoint-url">
+									Test endpoint
+								</label>
+								<input
+									id="test-endpoint-url"
+									name="test-endpoint-url"
+									class="mt-1 w-full rounded-2xl border border-white/60 bg-white/95 p-3 text-sm text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
+									type="url"
+									bind:value={testUrl}
+									placeholder="https://example.com/test-webhook"
+									aria-describedby="test-endpoint-help"
+								/>
+								<div class="mt-2 flex items-center justify-between text-xs text-secondary-slate/80">
+									<p id="test-endpoint-help">Used when the switch is set to Test.</p>
+									<button
+										type="button"
+										class="rounded-xl border border-white/50 px-3 py-1 font-semibold uppercase tracking-[0.2em] text-primary-navy hover:border-primary-navy disabled:cursor-not-allowed disabled:opacity-60"
+										on:click={() => (testUrl = TEST_POST_URL)}
+										disabled={testUrl === TEST_POST_URL}
+									>
+										Reset
+									</button>
+								</div>
+							</div>
+							<div>
+								<label class="block text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/80" for="prod-endpoint-url">
+									Production endpoint
+								</label>
+								<input
+									id="prod-endpoint-url"
+									name="prod-endpoint-url"
+									class="mt-1 w-full rounded-2xl border border-white/60 bg-white/95 p-3 text-sm text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
+									type="url"
+									bind:value={prodUrl}
+									placeholder="https://example.com/prod-webhook"
+									aria-describedby="prod-endpoint-help"
+								/>
+								<div class="mt-2 flex items-center justify-between text-xs text-secondary-slate/80">
+									<p id="prod-endpoint-help">Used when the switch is set to Production.</p>
+									<button
+										type="button"
+										class="rounded-xl border border-white/50 px-3 py-1 font-semibold uppercase tracking-[0.2em] text-primary-navy hover:border-primary-navy disabled:cursor-not-allowed disabled:opacity-60"
+										on:click={() => (prodUrl = PROD_POST_URL)}
+										disabled={prodUrl === PROD_POST_URL}
+									>
+										Reset
+									</button>
+								</div>
+							</div>
+						</div>
+					</details>
+				</div>
+
 				<fieldset class="space-y-4 rounded-2xl border border-white/60 bg-white/70 p-4" aria-describedby="story-type-tip">
 					<legend class="text-xs uppercase tracking-[0.3em] text-secondary-slate/70">Hot AI story types</legend>
 					<p id="story-type-tip" class="text-xs text-secondary-slate/80">
 						Choose a preset to auto-fill the investigation prompt with a known-good signal.
 					</p>
-					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label="Suggested investigation presets">
-						{#each STORY_TYPES as story (story.id)}
-							{@const isActive = selectedStoryTypeId === story.id}
-							<label
-								class={`group relative block cursor-pointer overflow-hidden rounded-[1.5rem] border-2 p-5 pb-6 pt-8 text-left shadow-sm transition-all ${
-									isActive
-										? 'border-primary-electric bg-primary-electric/10 text-primary-navy shadow-xl ring-2 ring-primary-electric/40'
-										: 'border-primary-electric/30 bg-white/80 text-secondary-slate outline outline-1 outline-primary-electric/10 hover:-translate-y-0.5 hover:border-primary-electric/50 hover:bg-white hover:outline-primary-electric/30'
-								}`}
-							>
-								<input
-									type="radio"
-									class="sr-only"
-									name="story-type"
-									value={story.id}
-									checked={isActive}
-									on:change={() => setStoryType(story.id)}
-								/>
-								<span class="text-xs font-semibold uppercase tracking-[0.3em]">{story.title}</span>
-								<p class="mt-3 text-sm text-secondary-slate/80">{story.description}</p>
-							</label>
-						{/each}
-					</div>
-				</fieldset>
-
-				<label class="block text-sm font-medium text-secondary-slate/90" for="webhook-url">
-					POST endpoint
-				</label>
-				<input
-					id="webhook-url"
-					name="webhook-url"
-					class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
-					bind:value={targetUrl}
-					placeholder="https://example.com/webhook"
-					type="url"
-					required
-					aria-describedby="webhook-tip"
-				/>
-				<p id="webhook-tip" class="text-xs text-secondary-slate/80">
-					Provide the HTTPS endpoint that receives the POST. Use Reset URL to switch back to Cambermast's test hook.
-				</p>
-				<div class="flex justify-start">
-					<button
-						type="button"
-						class="rounded-2xl border border-white/60 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-primary-navy hover:border-primary-navy disabled:cursor-not-allowed disabled:opacity-70"
-						on:click={() => (targetUrl = defaultUrl)}
-						disabled={isLoading || targetUrl === defaultUrl}
+			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label="Suggested investigation presets">
+				{#each STORY_TYPES as story (story.id)}
+					{@const isActive = selectedStoryTypeId === story.id}
+					<label
+						class={`group relative block cursor-pointer overflow-hidden rounded-[1.5rem] border-2 p-5 pb-6 pt-8 text-left shadow-sm transition-all ${
+							isActive
+								? 'border-primary-electric bg-primary-electric/10 text-primary-navy shadow-xl ring-2 ring-primary-electric/40'
+								: 'border-primary-electric/30 bg-white/80 text-secondary-slate outline outline-1 outline-primary-electric/10 hover:-translate-y-0.5 hover:border-primary-electric/50 hover:bg-white hover:outline-primary-electric/30'
+						}`}
 					>
-						Reset URL
-					</button>
-				</div>
+						<input
+							type="radio"
+							class="sr-only"
+							name="story-type"
+							value={story.id}
+							checked={isActive}
+							on:change={() => setStoryType(story.id)}
+						/>
+						<span class="text-xs font-semibold uppercase tracking-[0.3em]">{story.title}</span>
+						<p class="mt-3 text-sm text-secondary-slate/80">{story.description}</p>
+					</label>
+				{/each}
+			</div>
+		</fieldset>
+
 				<label class="block text-sm font-medium text-secondary-slate/90" for="callback-url">
 					Callback URL
 				</label>
@@ -462,7 +566,7 @@
 			<div class="rounded-2xl border border-white/60 bg-white/60 p-4 text-sm text-secondary-slate/90">
 				<p class="font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Payload preview</p>
 				<pre class="mt-3 overflow-auto rounded-xl bg-black/80 p-4 text-white">
-{JSON.stringify({ investigate: investigatePreviewValue, callbackUrl }, null, 2)}
+{JSON.stringify(payloadPreview, null, 2)}
 				</pre>
 			</div>
 		</div>
