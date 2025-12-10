@@ -512,6 +512,29 @@
 									</button>
 								</div>
 							</div>
+							<div>
+								<label class="block text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/80" for="callback-url">
+									Callback URL
+								</label>
+								<input
+									id="callback-url"
+									name="callback-url"
+									class="mt-1 w-full rounded-2xl border border-white/60 bg-white/95 p-3 text-sm text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
+									type="url"
+									bind:value={callbackUrl}
+									placeholder="https://example.com/callback"
+									aria-describedby="callback-tip"
+								/>
+								<p id="callback-tip" class="mt-2 text-xs text-secondary-slate/80">
+									This optional URL receives workflow callbacks. We pre-fill it with your session-aware stream endpoint.
+								</p>
+							</div>
+							<div>
+								<p class="text-xs font-semibold uppercase tracking-[0.3em] text-secondary-slate/80">Payload preview</p>
+								<pre class="mt-2 overflow-auto rounded-2xl border border-white/60 bg-black/80 p-4 text-sm text-white">
+{JSON.stringify(payloadPreview, null, 2)}
+								</pre>
+							</div>
 						</div>
 					</details>
 				</div>
@@ -546,29 +569,7 @@
 			</div>
 		</fieldset>
 
-				<label class="block text-sm font-medium text-secondary-slate/90" for="callback-url">
-					Callback URL
-				</label>
-				<input
-					id="callback-url"
-					name="callback-url"
-					class="w-full rounded-2xl border border-white/60 bg-white/80 p-4 text-primary-navy shadow-inner focus:border-primary-electric focus:outline-none"
-					bind:value={callbackUrl}
-					placeholder="https://example.com/callback"
-					type="url"
-					aria-describedby="callback-tip"
-				/>
-				<p id="callback-tip" class="text-xs text-secondary-slate/80">
-					This optional URL receives workflow callbacks. We pre-fill it with your session-aware stream endpoint.
-				</p>
 			</form>
-
-			<div class="rounded-2xl border border-white/60 bg-white/60 p-4 text-sm text-secondary-slate/90">
-				<p class="font-semibold uppercase tracking-[0.3em] text-secondary-slate/70">Payload preview</p>
-				<pre class="mt-3 overflow-auto rounded-xl bg-black/80 p-4 text-white">
-{JSON.stringify(payloadPreview, null, 2)}
-				</pre>
-			</div>
 		</div>
 	</section>
 
