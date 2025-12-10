@@ -601,11 +601,6 @@
 									? "Production"
 									: "Test"}</span
 							>
-							—
-							<code
-								class="whitespace-pre-wrap break-all text-[0.68rem]"
-								>{currentPostUrl}</code
-							>
 						</p>
 					</div>
 
